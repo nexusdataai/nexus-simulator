@@ -1,0 +1,21 @@
+services:
+  nexus-simulator:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: nexus-simulator:local
+    container_name: nexus-simulator
+    ports:
+      - "8000:8000"
+    environment:
+      LOG_LEVEL: INFO
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+      AWS_REGION: us-east-1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

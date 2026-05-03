@@ -1,0 +1,11 @@
+# Sample seed YAML for the SFDC plugin. Validated today by SeedYAMLRunner;
+# fully executable once Phase 6 lands the SFDC plugin.
+name: sfdc-smoke
+plugin: sfdc
+config:
+  reset_first: true
+actions:
+  - kind: status
+  - kind: load
+  - kind: seed
+  - kind: verify

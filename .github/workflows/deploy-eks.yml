@@ -1,0 +1,127 @@
+name: Deploy reference server to EKS
+
+# Wraps deploy/deploy-and-test.sh for CI-driven deploys.
+# Reuses nexus-backend's AWS infra: AWS_ROLE_TO_ASSUME_DEV, region us-east-1,
+# default cluster `nexus-dev`. Deploys into the new namespace `nexus-simulator`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options: [dev, stage, prod]
+      cluster_name:
+        description: 'EKS cluster name override (leave empty for environment default)'
+        required: false
+        type: string
+      image_tag:
+        description: "Image tag to deploy (defaults to <commit-sha>-test). Use 'latest-test' to redeploy."
+        required: false
+        type: string
+      tests:
+        description: "Comma-separated test tiers to run in-pod (or 'none' to skip)"
+        required: false
+        default: 'unit,integration,contract,property,e2e,journeys,bdd,endurance'
+        type: string
+      skip_provision:
+        description: 'Skip AWS resource provisioning (S3 buckets)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  AWS_REGION: 'us-east-1'
+  IMAGE_NAME: 'nexus-simulator'
+
+jobs:
+  deploy-eks:
+    runs-on: ubuntu-latest
+    environment: eks-${{ inputs.environment }}
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          IMAGE_TAG="${{ inputs.image_tag }}"
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG="$(git rev-parse --short HEAD)-test"
+          fi
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          echo "Using image tag: $IMAGE_TAG"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_DEV }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure kubectl
+        run: |
+          CLUSTER="${{ inputs.cluster_name || vars.EKS_CLUSTER_NAME || 'nexus-dev' }}"
+          aws eks update-kubeconfig --name "${CLUSTER}" --region ${{ env.AWS_REGION }}
+          echo "CLUSTER=${CLUSTER}" >> "$GITHUB_ENV"
+          kubectl version --client
+
+      - name: Run deploy-and-test.sh
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          chmod +x ./deploy/deploy-and-test.sh ./deploy/admin/setup-admin-role.sh
+          SKIP_PROVISION_FLAG=""
+          if [ "${{ inputs.skip_provision }}" = "true" ]; then
+            SKIP_PROVISION_FLAG="--skip-provision"
+          fi
+          ./deploy/deploy-and-test.sh \
+            --env "${{ inputs.environment }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --cluster "${CLUSTER}" \
+            --ecr-registry "${{ steps.login-ecr.outputs.registry }}" \
+            --image-tag "${{ steps.tag.outputs.image_tag }}" \
+            --tests "${{ inputs.tests }}" \
+            $SKIP_PROVISION_FLAG
+
+      - name: Upload BDD report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bdd-report-${{ inputs.environment }}
+          path: reports/bdd-${{ inputs.environment }}.html
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Deployment summary
+        if: always()
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
+          NAMESPACE: nexus-simulator
+        run: |
+          echo "## nexus-simulator EKS Deploy Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Environment | \`${{ inputs.environment }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cluster | \`${CLUSTER}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Namespace | \`${NAMESPACE}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Image | \`${IMAGE_NAME}:${IMAGE_TAG}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tests | \`${{ inputs.tests }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Pod status" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          kubectl -n "${NAMESPACE}" get pods -l app.kubernetes.io/name=nexus-simulator 2>&1 >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

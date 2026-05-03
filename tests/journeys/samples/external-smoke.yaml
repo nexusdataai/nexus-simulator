@@ -1,0 +1,7 @@
+name: external-smoke
+plugin: external_source
+actions:
+  - kind: status
+  - kind: load
+  - kind: seed
+  - kind: verify

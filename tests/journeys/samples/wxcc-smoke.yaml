@@ -1,0 +1,16 @@
+# Sample seed YAML for the WXCC plugin. Validated today by SeedYAMLRunner;
+# fully executable once Phase 5 lands the WXCC plugin and its admin routes.
+name: wxcc-smoke
+plugin: wxcc
+config:
+  num_tasks: 5
+  include_recordings: true
+  days_back: 3
+  use_current_time: false
+  reset_first: true
+  org_id: sim-org-001
+actions:
+  - kind: status
+  - kind: reset
+  - kind: seed
+  - kind: verify
