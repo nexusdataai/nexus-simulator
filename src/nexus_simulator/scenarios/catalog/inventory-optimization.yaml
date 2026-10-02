@@ -1,0 +1,23 @@
+solutionId: inventory-optimization
+title: Inventory Optimization
+scenarios:
+  - id: io.expiry-stockout
+    title: Expiry and stockout
+    summary: Near-expiry batches paired with low on-hand inventory.
+    kpis: [Fill Rate, Expiry Rate]
+    steps:
+      - id: bind-materials
+        title: Bind existing materials and plants
+        plugin: sap
+        tables: [Material_Master, Plant_Master]
+        action: select
+      - id: expiry-batches
+        title: Add near-expiry batches
+        plugin: sap
+        tables: [Batch_Master]
+        action: append
+      - id: low-stock
+        title: Add low stock positions
+        plugin: sap
+        tables: [Inventory_Position]
+        action: append

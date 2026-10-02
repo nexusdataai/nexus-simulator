@@ -1,0 +1,38 @@
+solutionId: customer-360
+title: Customer 360 & Revenue Growth
+scenarios:
+  - id: c360.churn-risk
+    title: Churn-risk accounts
+    summary: Active accounts with negative brand sentiment and stalled opportunities.
+    kpis: [Churn, Health Score]
+    steps:
+      - id: bind-accounts
+        title: Bind active accounts
+        plugin: sfdc
+        tables: [Account]
+        action: select
+      - id: sentiment
+        title: Add negative brand sentiment
+        plugin: external
+        tables: [Brand_Sentiment]
+        action: append
+      - id: stalled-opps
+        title: Add stalled opportunities
+        plugin: sfdc
+        tables: [Opportunity]
+        action: append
+  - id: c360.wallet-gap
+    title: Wallet-share gap
+    summary: High AR spend accounts with few SKUs on opportunity line items.
+    kpis: [Wallet Share]
+    steps:
+      - id: bind-high-ar
+        title: Bind high-spend AR customers
+        plugin: oracle
+        tables: [Oracle_AR_Invoice]
+        action: select
+      - id: thin-lines
+        title: Add thin opportunity line items
+        plugin: sfdc
+        tables: [Opportunity_Line_Item]
+        action: append

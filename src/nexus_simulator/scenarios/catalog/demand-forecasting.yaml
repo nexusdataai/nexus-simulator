@@ -1,0 +1,23 @@
+solutionId: demand-forecasting
+title: Demand Forecasting Engine
+scenarios:
+  - id: df.promo-lift
+    title: Promo lift vs baseline
+    summary: Active campaign plus forecast overrides and a demand-side market signal.
+    kpis: [MAPE, Promo Lift]
+    steps:
+      - id: bind-campaign
+        title: Bind an active campaign
+        plugin: sfdc
+        tables: [Campaign]
+        action: select
+      - id: overrides
+        title: Add forecast overrides
+        plugin: sfdc
+        tables: [Forecast_Override]
+        action: append
+      - id: signal
+        title: Add demand market signal
+        plugin: external
+        tables: [Market_Signal]
+        action: append

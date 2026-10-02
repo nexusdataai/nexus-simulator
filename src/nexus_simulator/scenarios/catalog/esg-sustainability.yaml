@@ -1,0 +1,23 @@
+solutionId: esg-sustainability
+title: ESG & Sustainability Tracker
+scenarios:
+  - id: esg.intensity-spike
+    title: Intensity spike
+    summary: Extra production volume plus a sustainability report showing higher intensity.
+    kpis: [CO2 Intensity]
+    steps:
+      - id: bind-plants
+        title: Bind plants and materials
+        plugin: sap
+        tables: [Plant_Master, Material_Master]
+        action: select
+      - id: extra-orders
+        title: Add high-volume production orders
+        plugin: sap
+        tables: [Production_Order]
+        action: append
+      - id: report
+        title: Add intensity sustainability report
+        plugin: external
+        tables: [Sustainability_Report]
+        action: append

@@ -1,11 +1,4 @@
-"""FastAPI app factory for the Nexus Simulator reference server.
-
-The factory composes the routers that belong to the library: health/readiness,
-WXCC, SFDC, Oracle ERP, SAP, External Source. Each plugin router is mounted
-under the same prefix nexus-backend uses today (see ``mcp_http_gateway.py``
-lines 1508–1554) so UIs and MCP clients work unchanged when a host app swaps
-its own simulator routes for the library's.
-"""
+"""FastAPI app factory for the Nexus Simulator product server."""
 
 from __future__ import annotations
 
@@ -16,12 +9,26 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .. import __version__
+from . import connector_runtime
+from .routers import catalog as catalog_router
 from .routers import external as external_router
+from .routers import fdw as fdw_router
 from .routers import health as health_router
 from .routers import oracle_erp as oracle_erp_router
 from .routers import sap as sap_router
 from .routers import sfdc as sfdc_router
+from .routers import sourcing as sourcing_router
+from .routers import tpm as tpm_router
 from .routers import wxcc as wxcc_router
+from .routers.connectors import external_connector_api
+from .routers.connectors import oracle_erp_connector_api
+from .routers.connectors import sap_connector_api
+from .routers.connectors import sfdc_connector_api
+from .routers import oracle_fusion as oracle_fusion_router
+from .routers import sap_odata as sap_odata_router
+from .routers import sfdc_rest as sfdc_rest_router
+from .routers import scenarios as scenarios_router
+from .routers import vendor_apis as vendor_apis_router
 
 logger = logging.getLogger(__name__)
 
@@ -30,34 +37,23 @@ SFDC_PREFIX = "/api/v1/sfdc-simulator"
 ORACLE_ERP_PREFIX = "/api/v1/oracle-erp-simulator"
 SAP_PREFIX = "/api/v1/sap-simulator"
 EXTERNAL_PREFIX = "/api/v1/external-simulator"
+TPM_PREFIX = "/api/v1/tpm-simulator"
+SOURCING_PREFIX = "/api/v1/sourcing-simulator"
 
 
 def create_app(simulator: Any | None = None, *, cors_origins: list[str] | None = None) -> FastAPI:
-    """Build the reference FastAPI app.
-
-    Args:
-        simulator: A ``Simulator`` instance produced by
-            ``nexus_simulator.factory.build_simulator``. When ``None``, routes
-            that require plugins return 503 (configuration missing). For tests,
-            use ``nexus_simulator.testing.make_test_app`` which wires an
-            in-memory simulator automatically.
-        cors_origins: Optional list of allowed CORS origins. ``None`` disables CORS.
-
-    Returns:
-        A configured ``FastAPI`` instance. The caller is responsible for
-        running it (``uvicorn``, test client, etc.).
-    """
+    """Build the product FastAPI app."""
     app = FastAPI(
         title="Nexus Simulator",
         version=__version__,
         description=(
-            "Pluggable simulator library. Reference server exposing the "
-            "canonical HTTP surface ported from nexus-backend's per-plugin "
-            "simulator APIs (WXCC, SFDC, Oracle ERP, SAP, External Source)."
+            "Standalone Enterprise Data Simulator service. Hosts Redis/S3-backed "
+            "FDW catalogs and simulated Salesforce / Oracle / SAP / external / CPQ APIs."
         ),
     )
 
     app.state.simulator = simulator
+    connector_runtime.configure_runtime(simulator)
 
     if cors_origins:
         app.add_middleware(
@@ -69,11 +65,48 @@ def create_app(simulator: Any | None = None, *, cors_origins: list[str] | None =
         )
 
     app.include_router(health_router.router, tags=["health"])
+    app.include_router(catalog_router.router)
+    app.include_router(fdw_router.router)
     app.include_router(wxcc_router.router, prefix=WXCC_PREFIX, tags=["WXCC Simulator"])
     app.include_router(sfdc_router.router, prefix=SFDC_PREFIX, tags=["SFDC Simulator"])
     app.include_router(oracle_erp_router.router, prefix=ORACLE_ERP_PREFIX, tags=["Oracle ERP Simulator"])
     app.include_router(sap_router.router, prefix=SAP_PREFIX, tags=["SAP Simulator"])
     app.include_router(external_router.router, prefix=EXTERNAL_PREFIX, tags=["External Simulator"])
+    app.include_router(tpm_router.router, prefix=TPM_PREFIX, tags=["TPM Simulator"])
+    app.include_router(sourcing_router.router, prefix=SOURCING_PREFIX, tags=["Sourcing Simulator"])
+    app.include_router(sfdc_connector_api.router)
+    app.include_router(oracle_erp_connector_api.router)
+    app.include_router(sap_connector_api.router)
+    app.include_router(external_connector_api.router)
+    app.include_router(vendor_apis_router.router)
+    app.include_router(scenarios_router.router)
+    app.include_router(sfdc_rest_router.router)
+    app.include_router(oracle_fusion_router.router)
+    app.include_router(sap_odata_router.router)
 
-    logger.info("Nexus Simulator reference server app created (version %s)", __version__)
+    @app.on_event("startup")
+    async def _hydrate_plugins() -> None:
+        if simulator is None:
+            return
+        for name, svc in simulator.registry.all().items():
+            if name in ("simulator", "oracle_erp", "external_source"):
+                continue
+            try:
+                if hasattr(svc, "ensure_loaded"):
+                    await svc.ensure_loaded()
+                if not getattr(svc, "loaded", False) and hasattr(svc, "seed_data"):
+                    await svc.seed_data()
+                if hasattr(svc, "rebuild_catalog_from_cache"):
+                    await svc.rebuild_catalog_from_cache()
+                logger.info(
+                    "simulator plugin ready: %s loaded=%s tables=%s rows=%s",
+                    name,
+                    getattr(svc, "loaded", False),
+                    getattr(svc, "_tables", None) and len(svc._tables),
+                    getattr(svc, "_total_rows", None),
+                )
+            except Exception:
+                logger.exception("simulator plugin hydrate failed: %s", name)
+
+    logger.info("Nexus Simulator app created (version %s)", __version__)
     return app

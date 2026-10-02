@@ -80,6 +80,22 @@ class S3StorageBackend:
 
         return await asyncio.to_thread(_read)
 
+    async def ensure_bucket(self) -> None:
+        def _ensure() -> None:
+            client = self._s3()
+            try:
+                client.head_bucket(Bucket=self.bucket)
+            except Exception:
+                kwargs: dict[str, Any] = {"Bucket": self.bucket}
+                if self._region and self._region != "us-east-1":
+                    kwargs["CreateBucketConfiguration"] = {"LocationConstraint": self._region}
+                try:
+                    client.create_bucket(**kwargs)
+                except Exception as exc:  # noqa: BLE001
+                    s3_logger.warning(f"create_bucket {self.bucket} failed: {exc}")
+
+        await asyncio.to_thread(_ensure)
+
     async def put_json(self, key: str, value: Any) -> None:
         full = self._full_key(key)
         body = json.dumps(value, default=str).encode("utf-8")

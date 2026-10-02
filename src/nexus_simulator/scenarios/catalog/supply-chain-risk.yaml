@@ -1,0 +1,23 @@
+solutionId: supply-chain-risk
+title: Supply Chain Risk Radar
+scenarios:
+  - id: scr.single-source
+    title: Single-source concentration
+    summary: Concentrated POs on one vendor plus a high-severity market signal.
+    kpis: [Risk Score, Single Source]
+    steps:
+      - id: bind-vendor
+        title: Bind a vendor
+        plugin: sap
+        tables: [Vendor_Master]
+        action: select
+      - id: concentrated-pos
+        title: Add concentrated purchase orders
+        plugin: oracle
+        tables: [Oracle_Purchase_Order]
+        action: append
+      - id: signal
+        title: Add disruption signal
+        plugin: external
+        tables: [Market_Signal]
+        action: append

@@ -41,6 +41,9 @@ class InMemoryStorageBackend:
         except (json.JSONDecodeError, UnicodeDecodeError):
             return None
 
+    async def ensure_bucket(self) -> None:
+        return None
+
     async def put_json(self, key: str, value: Any) -> None:
         self._store[self._full_key(key)] = json.dumps(value, default=str).encode("utf-8")
 
@@ -102,6 +105,11 @@ class InMemoryCacheBackend:
 
     async def set_json(self, key: str, value: Any, ttl_seconds: int | None = None) -> None:
         self._store[key] = json.dumps(value, default=str)
+
+    async def scan_keys(self, pattern: str) -> list[str]:
+        import fnmatch
+
+        return [k for k in self._store if fnmatch.fnmatch(k, pattern)]
 
     async def mget(self, keys: list[str]) -> list[str | None]:
         return [self._store.get(k) for k in keys]

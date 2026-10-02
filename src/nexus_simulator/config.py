@@ -66,6 +66,24 @@ class ExternalSourcePluginConfig:
 
 
 @dataclass(frozen=True)
+class TPMPluginConfig:
+    """Trade CPQ (sell-side) simulator settings."""
+
+    bucket: str = ""
+    prefix: str = "tpm-simulator"
+    enabled: bool = True
+
+
+@dataclass(frozen=True)
+class SourcingPluginConfig:
+    """Sourcing CPQ (buy-side) simulator settings."""
+
+    bucket: str = ""
+    prefix: str = "sourcing-simulator"
+    enabled: bool = True
+
+
+@dataclass(frozen=True)
 class SimulatorConfig:
     """Runtime settings required to assemble the simulator.
 
@@ -83,5 +101,7 @@ class SimulatorConfig:
     oracle_erp: OracleERPPluginConfig | None = None
     sap: SAPPluginConfig | None = None
     external_source: ExternalSourcePluginConfig | None = None
+    tpm: TPMPluginConfig | None = None
+    sourcing: SourcingPluginConfig | None = None
 
     extras: dict = field(default_factory=dict)

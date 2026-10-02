@@ -58,6 +58,8 @@ class Simulator:
     oracle_erp: Any | None = None
     sap: Any | None = None
     external_source: Any | None = None
+    tpm: Any | None = None
+    sourcing: Any | None = None
 
 
 def _build_cache(config: SimulatorConfig) -> CacheBackend:
@@ -114,6 +116,7 @@ def build_simulator(config: SimulatorConfig) -> Simulator:
         sfdc._storage = _build_storage(config.sfdc.bucket, config.sfdc.prefix, config.region)
         sim.sfdc = sfdc
         registry.register("sfdc", sfdc)
+        registry.register("simulator", sfdc)
 
     if config.oracle_erp is not None:
         from .plugins.oracle_erp import OracleERPSimulatorService
@@ -127,6 +130,7 @@ def build_simulator(config: SimulatorConfig) -> Simulator:
         )
         sim.oracle_erp = oracle
         registry.register("oracle_erp", oracle)
+        registry.register("oracle", oracle)
 
     if config.sap is not None:
         from .plugins.sap import SAPSimulatorService
@@ -151,6 +155,29 @@ def build_simulator(config: SimulatorConfig) -> Simulator:
         )
         sim.external_source = ext
         registry.register("external_source", ext)
+        registry.register("external", ext)
+
+    if config.tpm is not None:
+        from .plugins.tpm import TPMSimulatorService
+
+        tpm = TPMSimulatorService(bucket=config.tpm.bucket, prefix=config.tpm.prefix)
+        tpm._cache = cache
+        tpm._storage = _build_storage(config.tpm.bucket, config.tpm.prefix, config.region)
+        sim.tpm = tpm
+        registry.register("tpm", tpm)
+
+    if config.sourcing is not None:
+        from .plugins.sourcing import SourcingSimulatorService
+
+        sourcing = SourcingSimulatorService(
+            bucket=config.sourcing.bucket, prefix=config.sourcing.prefix
+        )
+        sourcing._cache = cache
+        sourcing._storage = _build_storage(
+            config.sourcing.bucket, config.sourcing.prefix, config.region
+        )
+        sim.sourcing = sourcing
+        registry.register("sourcing", sourcing)
 
     # Out-of-tree plugins registered via register_simulator() are wired last
     # so they cannot accidentally collide with the in-tree set on the same

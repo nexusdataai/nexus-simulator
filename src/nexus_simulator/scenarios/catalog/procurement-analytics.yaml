@@ -1,0 +1,18 @@
+solutionId: procurement-analytics
+title: Procurement & Spend Analytics
+scenarios:
+  - id: pa.maverick-spend
+    title: Maverick spend
+    summary: Oracle purchase orders with no matching contract document.
+    kpis: [Maverick Rate]
+    steps:
+      - id: bind-vendors
+        title: Bind existing vendors and materials
+        plugin: sap
+        tables: [Vendor_Master]
+        action: select
+      - id: orphan-pos
+        title: Add POs without a contract
+        plugin: oracle
+        tables: [Oracle_Purchase_Order]
+        action: append

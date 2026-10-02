@@ -39,13 +39,15 @@ def _build_simulator_config():
         OracleERPPluginConfig,
         SAPPluginConfig,
         SFDCPluginConfig,
+        SourcingPluginConfig,
         SimulatorConfig,
+        TPMPluginConfig,
         WXCCPluginConfig,
     )
 
     def _wxcc():
         bucket = os.environ.get("WXCC_SIMULATOR_BUCKET", "")
-        if not bucket and os.environ.get("WXCC_SIMULATOR_ENABLED", "true").lower() == "false":
+        if os.environ.get("WXCC_SIMULATOR_ENABLED", "false").lower() != "true":
             return None
         return WXCCPluginConfig(
             bucket=bucket,
@@ -57,39 +59,51 @@ def _build_simulator_config():
         )
 
     def _sfdc():
-        bucket = os.environ.get("SFDC_SIMULATOR_BUCKET", "")
-        if not bucket:
+        if os.environ.get("SFDC_SIMULATOR_ENABLED", "true").lower() == "false":
             return None
         return SFDCPluginConfig(
-            bucket=bucket,
+            bucket=os.environ.get("SFDC_SIMULATOR_BUCKET", ""),
             prefix=os.environ.get("SFDC_SIMULATOR_PREFIX", "sfdc-simulator"),
         )
 
     def _oracle_erp():
-        bucket = os.environ.get("ORACLE_ERP_SIMULATOR_BUCKET", "")
-        if not bucket:
+        if os.environ.get("ORACLE_ERP_SIMULATOR_ENABLED", "true").lower() == "false":
             return None
         return OracleERPPluginConfig(
-            bucket=bucket,
+            bucket=os.environ.get("ORACLE_ERP_SIMULATOR_BUCKET", ""),
             prefix=os.environ.get("ORACLE_ERP_SIMULATOR_PREFIX", "oracle-erp-simulator"),
         )
 
     def _sap():
-        bucket = os.environ.get("SAP_SIMULATOR_BUCKET", "")
-        if not bucket:
+        if os.environ.get("SAP_SIMULATOR_ENABLED", "true").lower() == "false":
             return None
         return SAPPluginConfig(
-            bucket=bucket,
+            bucket=os.environ.get("SAP_SIMULATOR_BUCKET", ""),
             prefix=os.environ.get("SAP_SIMULATOR_PREFIX", "sap-simulator"),
         )
 
     def _external_source():
-        bucket = os.environ.get("EXTERNAL_SIMULATOR_BUCKET", "")
-        if not bucket:
+        if os.environ.get("EXTERNAL_SIMULATOR_ENABLED", "true").lower() == "false":
             return None
         return ExternalSourcePluginConfig(
-            bucket=bucket,
+            bucket=os.environ.get("EXTERNAL_SIMULATOR_BUCKET", ""),
             prefix=os.environ.get("EXTERNAL_SIMULATOR_PREFIX", "external-simulator"),
+        )
+
+    def _tpm():
+        if os.environ.get("TPM_SIMULATOR_ENABLED", "true").lower() == "false":
+            return None
+        return TPMPluginConfig(
+            bucket=os.environ.get("TPM_SIMULATOR_BUCKET", ""),
+            prefix=os.environ.get("TPM_SIMULATOR_PREFIX", "tpm-simulator"),
+        )
+
+    def _sourcing():
+        if os.environ.get("SOURCING_SIMULATOR_ENABLED", "true").lower() == "false":
+            return None
+        return SourcingPluginConfig(
+            bucket=os.environ.get("SOURCING_SIMULATOR_BUCKET", ""),
+            prefix=os.environ.get("SOURCING_SIMULATOR_PREFIX", "sourcing-simulator"),
         )
 
     return SimulatorConfig(
@@ -101,6 +115,8 @@ def _build_simulator_config():
         oracle_erp=_oracle_erp(),
         sap=_sap(),
         external_source=_external_source(),
+        tpm=_tpm(),
+        sourcing=_sourcing(),
     )
 
 

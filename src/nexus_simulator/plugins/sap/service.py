@@ -252,4 +252,7 @@ class SAPSimulatorService(BaseSimulatorService):
                                  "Discount_Pct": round(_r.uniform(0, 25), 1), "Region": pick(REGIONS)})
         data_map["cspmb__Price_Item__c"] = price_items
 
+        from nexus_simulator.plugins.diagnostic_seed import apply_sentinels
+        apply_sentinels("sap", data_map)
+
         return await self._finalize_seed(SCHEMA, SERVER, data_map)

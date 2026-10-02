@@ -123,6 +123,18 @@ class RedisCacheBackend:
     async def set_json(self, key: str, value: Any, ttl_seconds: int | None = None) -> None:
         await self.set(key, json.dumps(value, default=str), ttl_seconds=ttl_seconds)
 
+    async def scan_keys(self, pattern: str) -> list[str]:
+        r = await self._get_pool()
+        if r:
+            try:
+                found: list[str] = []
+                async for key in r.scan_iter(match=pattern, count=1000):
+                    found.append(key)
+                return found
+            except Exception as e:  # noqa: BLE001
+                redis_logger.warning(f"Redis SCAN failed for {pattern}: {e}")
+        return await self._fallback.scan_keys(pattern)
+
     async def mget(self, keys: list[str]) -> list[str | None]:
         if not keys:
             return []

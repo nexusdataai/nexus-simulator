@@ -1,0 +1,38 @@
+solutionId: order-to-cash
+title: Order to Cash Monitor
+scenarios:
+  - id: o2c.revenue-leakage
+    title: Delivered without matching AR invoice
+    summary: Closed-won SFDC opportunities with SAP deliveries and missing or under-billed Oracle invoices.
+    kpis: [Match Rate, Leakage]
+    steps:
+      - id: bind-accounts
+        title: Bind existing accounts and closed-won opportunities
+        plugin: sfdc
+        tables: [Opportunity]
+        action: select
+      - id: deliveries
+        title: Add unmatched outbound deliveries
+        plugin: sap
+        tables: [Delivery_Document, Shipment]
+        action: append
+      - id: underbill
+        title: Add under-billed AR invoices
+        plugin: oracle
+        tables: [Oracle_AR_Invoice]
+        action: append
+  - id: o2c.past-due-ar
+    title: Past-due open AR
+    summary: Open Oracle AR invoices more than 60 days overdue on existing customers.
+    kpis: [DSO, Past Due AR]
+    steps:
+      - id: bind-customers
+        title: Bind existing AR customers
+        plugin: oracle
+        tables: [Oracle_AR_Customer]
+        action: select
+      - id: overdue-invoices
+        title: Add overdue open invoices
+        plugin: oracle
+        tables: [Oracle_AR_Invoice]
+        action: append

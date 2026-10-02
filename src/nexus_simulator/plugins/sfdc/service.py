@@ -162,6 +162,9 @@ class SFDCSimulatorService(BaseSimulatorService):
             })
         data_map["Lead"] = leads
 
+        from nexus_simulator.plugins.diagnostic_seed import apply_sentinels
+        apply_sentinels("sfdc", data_map)
+
         return await self._finalize_seed(SCHEMA, SERVER, data_map)
 
     # ─── Dump status (S3-backed for multi-pod consistency) ──────────────

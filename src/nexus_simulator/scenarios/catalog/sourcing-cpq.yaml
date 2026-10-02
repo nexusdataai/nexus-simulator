@@ -1,0 +1,18 @@
+solutionId: sourcing-cpq
+title: Sourcing CPQ
+scenarios:
+  - id: sourcing.dual-vs-single
+    title: Dual-source vs single-source
+    summary: Overlay vendor quotes that contrast a dual-source award with a single-source bid.
+    kpis: [Savings, Single-Source]
+    steps:
+      - id: bind-rfx
+        title: Bind an open RFx
+        plugin: sourcing
+        tables: [RFx_Event]
+        action: select
+      - id: quotes
+        title: Add competing vendor quotes
+        plugin: sourcing
+        tables: [Vendor_Quote]
+        action: append

@@ -1,0 +1,18 @@
+solutionId: trade-cpq
+title: Trade CPQ
+scenarios:
+  - id: trade.quote-leakage
+    title: Quote leakage
+    summary: Quotes priced below floor versus the active price book.
+    kpis: [Leakage, Auto-Approve]
+    steps:
+      - id: bind-book
+        title: Bind an active price book
+        plugin: tpm
+        tables: [Price_Book, Price_Book_Entry]
+        action: select
+      - id: leak-quotes
+        title: Add below-floor quotes
+        plugin: tpm
+        tables: [Quote_Header, Quote_Line]
+        action: append

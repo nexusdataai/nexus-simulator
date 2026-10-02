@@ -169,4 +169,7 @@ class OracleERPSimulatorService(BaseSimulatorService):
                               "Tax_Code": pick(["GST_7", "GST_0", "EXEMPT", "GST_7", "GST_7"])})
         data_map["Oracle_Product_Master"] = products
 
+        from nexus_simulator.plugins.diagnostic_seed import apply_sentinels
+        apply_sentinels("oracle", data_map)
+
         return await self._finalize_seed(SCHEMA, SERVER, data_map)

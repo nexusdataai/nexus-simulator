@@ -125,14 +125,19 @@ class BaseSimulator(ABC):
         return self._loaded
 
     async def ensure_loaded(self) -> None:
+        rebuilt = await self.rebuild_catalog_from_cache()
+        if rebuilt:
+            return
         if not self._loaded and self.bucket:
             await self.load_from_s3()
+            await self.rebuild_catalog_from_cache()
         elif self._loaded and self._tables:
             sample = self._tables[0]
             count = await self._get_table_row_count(sample.schema_name, sample.table_name)
             if count == 0 and self._total_rows > 0:
                 self._sim_logger.warning("Cache data expired, reloading from S3")
                 await self.load_from_s3()
+                await self.rebuild_catalog_from_cache()
 
     # ─── Cache key layout ────────────────────────────────────────────────
 
@@ -183,6 +188,87 @@ class BaseSimulator(ABC):
             except (ValueError, TypeError):
                 counts[key] = 0
         return counts
+
+    async def rebuild_catalog_from_cache(self) -> bool:
+        """Rebuild the FDW catalogue from Redis keys already populated.
+
+        Journey processors and prior ontology seeds write extra tables into
+        the shared Redis. The in-memory ``_tables`` list must pick those up
+        or the UI/FDW APIs only show the last seed subset.
+        """
+        scan = getattr(self._cache, "scan_keys", None) if self._cache is not None else None
+        if scan is None:
+            return bool(self._tables)
+        prefix = f"sim:{self.SERVICE_NAME}:"
+        try:
+            keys = await scan(f"{prefix}*")
+        except Exception as exc:
+            self._sim_logger.warning(f"catalog scan failed: {exc}")
+            return bool(self._tables)
+
+        count_prefix = f"{prefix}count:"
+        meta_prefix = f"{prefix}meta:"
+        discovered: list[tuple[str, str]] = []
+        for key in keys:
+            if key.startswith(count_prefix) or key.startswith(meta_prefix):
+                continue
+            rest = key[len(prefix) :]
+            if "." not in rest:
+                continue
+            schema, table = rest.split(".", 1)
+            if schema and table:
+                discovered.append((schema, table))
+        if not discovered:
+            return bool(self._tables)
+
+        server = (
+            self._servers[0].server_name
+            if self._servers
+            else self._manifest.get("server_name", f"{self.SERVICE_NAME}_simulator")
+        )
+        if not self._servers:
+            self._servers = [
+                ForeignServerInfo(server_name=server, wrapper_type="simulator", server_options={})
+            ]
+
+        known = {(t.schema_name, t.table_name) for t in self._tables}
+        for schema, table in discovered:
+            if (schema, table) in known:
+                continue
+            rows = await self._get_table_data(schema, table)
+            self._tables.append(
+                ForeignTableInfo(
+                    schema_name=schema,
+                    table_name=table,
+                    server_name=server,
+                    column_count=len(rows[0]) if rows else 0,
+                )
+            )
+            if rows:
+                self._auto_register_columns(schema, table, rows[0])
+            known.add((schema, table))
+
+        counts = await self._get_all_row_counts()
+        self._tables_with_data = sum(1 for n in counts.values() if n > 0)
+        self._total_rows = sum(counts.values())
+        self._loaded = True
+        if self._loaded_at is None:
+            self._loaded_at = datetime.now(timezone.utc)
+        schema = discovered[0][0] if discovered else self._manifest.get("schema", "")
+        self._manifest = {
+            **self._manifest,
+            "schema": schema or self._manifest.get("schema", ""),
+            "total_tables": len(self._tables),
+            "total_rows_dumped": self._total_rows,
+            "dump_timestamp": self._manifest.get("dump_timestamp")
+            or (self._loaded_at.isoformat() if self._loaded_at else None),
+        }
+        self._sim_logger.info(
+            f"{self.SERVICE_NAME} catalog rebuilt from cache — "
+            f"{len(self._tables)} tables, {self._tables_with_data} with data, "
+            f"{self._total_rows:,} rows"
+        )
+        return True
 
     # ─── Load status tracking ────────────────────────────────────────────
 
@@ -341,8 +427,10 @@ class BaseSimulator(ABC):
             self._loaded_at = datetime.now(timezone.utc)
             self._tables_with_data = tables_loaded
             self._total_rows = total_rows
+            await self.rebuild_catalog_from_cache()
 
-            tables_with_data = tables_loaded
+            tables_with_data = self._tables_with_data
+            total_rows = self._total_rows
             msg = (
                 f"Load complete — {len(self._tables)} tables, {tables_with_data} with data, "
                 f"{total_rows:,} rows in {elapsed:.1f}s"
@@ -468,6 +556,85 @@ class BaseSimulator(ABC):
         )
         return QueryResponse(rows=rows, metadata=metadata)
 
+    async def write_table(self, schema: str, table: str, rows: list[dict]) -> int:
+        """Replace table contents and register the table in the FDW catalogue."""
+        rows = list(rows or [])
+        await self._store_table(schema, table, rows)
+        if rows:
+            known = {(t.schema_name, t.table_name) for t in self._tables}
+            if (schema, table) not in known:
+                self._tables.append(
+                    ForeignTableInfo(
+                        schema_name=schema,
+                        table_name=table,
+                        server_name=self._manifest.get("server_name", f"{self.SERVICE_NAME}_simulator"),
+                        column_count=len(rows[0]),
+                    )
+                )
+            if (schema, table) not in self._columns:
+                self._columns[(schema, table)] = [
+                    ColumnInfo(
+                        column_name=k,
+                        data_type="string",
+                        is_nullable=True,
+                        ordinal_position=i + 1,
+                    )
+                    for i, k in enumerate(rows[0].keys())
+                ]
+        counts = await self._get_all_row_counts()
+        if counts:
+            self._tables_with_data = sum(1 for n in counts.values() if n > 0)
+            self._total_rows = sum(counts.values())
+        await self._persist_table_to_s3(schema, table, rows)
+        return len(rows)
+
+    async def _persist_table_to_s3(self, schema: str, table: str, rows: list[dict]) -> None:
+        """Write the mutated table back to MinIO/S3 so dumps survive Redis TTL."""
+        if not self.bucket or self._storage is None:
+            return
+        try:
+            ensure = getattr(self._storage, "ensure_bucket", None)
+            if callable(ensure):
+                await ensure()
+            await self._storage.put_json(f"data/{schema}.{table}.json", rows)
+            tables_json = await self._storage.get_json("tables.json")
+            if isinstance(tables_json, list):
+                found = False
+                for entry in tables_json:
+                    name = entry.get("tableName") or entry.get("table_name")
+                    sch = entry.get("schemaName") or entry.get("schema_name")
+                    if name == table and sch == schema:
+                        entry["columnCount"] = len(rows[0]) if rows else entry.get("columnCount", 0)
+                        found = True
+                        break
+                if not found:
+                    tables_json.append({
+                        "schemaName": schema,
+                        "tableName": table,
+                        "serverName": self._manifest.get("server_name", f"{self.SERVICE_NAME}_simulator"),
+                        "columnCount": len(rows[0]) if rows else 0,
+                    })
+                await self._storage.put_json("tables.json", tables_json)
+            manifest = await self._storage.get_json("manifest.json") or dict(self._manifest)
+            if isinstance(manifest, dict):
+                data_tables = dict(manifest.get("data_tables") or {})
+                data_tables[table] = len(rows)
+                manifest["data_tables"] = data_tables
+                manifest["tables_with_data"] = sum(1 for n in data_tables.values() if n)
+                manifest["total_rows_dumped"] = sum(data_tables.values())
+                await self._storage.put_json("manifest.json", manifest)
+        except Exception as exc:  # noqa: BLE001
+            self._sim_logger.warning(f"S3 persist failed for {schema}.{table}: {exc}")
+
+    async def append_rows(self, schema: str, table: str, rows: list[dict]) -> int:
+        if not rows:
+            existing = await self._get_table_data(schema, table)
+            return len(existing)
+        existing = await self._get_table_data(schema, table)
+        combined = list(existing) + list(rows)
+        await self.write_table(schema, table, combined)
+        return len(combined)
+
     @staticmethod
     def _match_filter(row: dict, column: str, operator: str, value: Any) -> bool:
         rv = row.get(column)
@@ -566,10 +733,11 @@ class BaseSimulator(ABC):
             "total_tables": len(self._tables),
             "total_rows_dumped": total_rows,
         }
+        await self.rebuild_catalog_from_cache()
         elapsed = time.monotonic() - start
         msg = (
             f"{self.SERVICE_NAME} seed complete — {len(self._tables)} tables, "
-            f"{total_rows:,} rows in {elapsed:.1f}s"
+            f"{self._total_rows:,} rows in {elapsed:.1f}s"
         )
         self._sim_logger.info(msg)
         return {

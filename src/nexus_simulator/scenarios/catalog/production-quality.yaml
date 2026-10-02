@@ -1,0 +1,18 @@
+solutionId: production-quality
+title: Production & Quality Copilot
+scenarios:
+  - id: pq.yield-drop
+    title: Yield drop
+    summary: In-progress production orders with failed inspection lots.
+    kpis: [Yield, First Pass]
+    steps:
+      - id: bind-orders
+        title: Bind existing production orders
+        plugin: sap
+        tables: [Production_Order]
+        action: select
+      - id: failed-lots
+        title: Add failed inspection lots
+        plugin: sap
+        tables: [Quality_Inspection_Lot]
+        action: append
