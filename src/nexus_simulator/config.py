@@ -84,6 +84,42 @@ class SourcingPluginConfig:
 
 
 @dataclass(frozen=True)
+class BSSPluginConfig:
+    """Telecom BSS simulator settings."""
+
+    bucket: str = ""
+    prefix: str = "bss-simulator"
+    enabled: bool = True
+
+
+@dataclass(frozen=True)
+class NSSPluginConfig:
+    """Telecom NSS simulator settings."""
+
+    bucket: str = ""
+    prefix: str = "nss-simulator"
+    enabled: bool = True
+
+
+@dataclass(frozen=True)
+class OSSPluginConfig:
+    """Telecom OSS simulator settings."""
+
+    bucket: str = ""
+    prefix: str = "oss-simulator"
+    enabled: bool = True
+
+
+@dataclass(frozen=True)
+class TelcoGoldenPluginConfig:
+    """Telecom customer golden table simulator settings."""
+
+    bucket: str = ""
+    prefix: str = "telco-golden-simulator"
+    enabled: bool = True
+
+
+@dataclass(frozen=True)
 class SimulatorConfig:
     """Runtime settings required to assemble the simulator.
 
@@ -103,5 +139,9 @@ class SimulatorConfig:
     external_source: ExternalSourcePluginConfig | None = None
     tpm: TPMPluginConfig | None = None
     sourcing: SourcingPluginConfig | None = None
+    bss: BSSPluginConfig | None = None
+    nss: NSSPluginConfig | None = None
+    oss: OSSPluginConfig | None = None
+    telco_golden: TelcoGoldenPluginConfig | None = None
 
     extras: dict = field(default_factory=dict)

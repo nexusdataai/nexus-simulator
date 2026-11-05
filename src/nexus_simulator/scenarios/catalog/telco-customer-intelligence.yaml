@@ -1,0 +1,77 @@
+solution_id: telco-customer-intelligence
+solution_title: Telco Customer Intelligence
+scenarios:
+  - id: telco.usage-decline
+    title: Usage decline with home-cell outage
+    description: Inject network outage and usage drop for a shortlist of subscribers (S001 archetype).
+    steps:
+      - id: bind-decline
+        title: Bind network-decline customers
+        plugin: bss
+        tables: [Subscriber_Profile]
+        action: bind
+      - id: outage
+        title: Raise OSS alarms on home cells
+        plugin: oss
+        tables: [Network_Alarm]
+        action: append
+      - id: usage-drop
+        title: Append depressed usage days
+        plugin: nss
+        tables: [Usage_Daily_Agg]
+        action: append
+
+  - id: telco.churn-portout
+    title: Port-out churn intent
+    description: Add MNP requests and care contacts for churn workflow (S004 archetype).
+    steps:
+      - id: bind-portout
+        title: Bind port-out candidates
+        plugin: bss
+        tables: [Subscriber_Profile]
+        action: bind
+      - id: mnp
+        title: Append MNP port-out requests
+        plugin: bss
+        tables: [MNP_Port_Out_Request]
+        action: append
+      - id: care
+        title: Append care interactions
+        plugin: bss
+        tables: [Care_Interaction]
+        action: append
+
+  - id: telco.upsell-ready
+    title: Upsell / offer response
+    description: High usage vs quota customers with ignored upgrade offers.
+    steps:
+      - id: bind-upsell
+        title: Bind upsell-ready customers
+        plugin: bss
+        tables: [Subscriber_Profile]
+        action: bind
+      - id: offers
+        title: Append ignored campaign offers
+        plugin: bss
+        tables: [Campaign_Offer]
+        action: append
+      - id: app-intent
+        title: Append plan-compare app sessions
+        plugin: bss
+        tables: [App_Web_Session]
+        action: append
+
+  - id: telco.policy-throttle
+    title: Policy / FUP usage decline
+    description: Usage drop explained by fair-usage throttling without OSS alarms (S003).
+    steps:
+      - id: bind-policy
+        title: Bind policy-decline customers
+        plugin: bss
+        tables: [Subscriber_Profile]
+        action: bind
+      - id: throttle
+        title: Append FUP throttle events
+        plugin: nss
+        tables: [Policy_Throttle_Event]
+        action: append

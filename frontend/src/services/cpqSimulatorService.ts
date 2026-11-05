@@ -128,5 +128,31 @@ class CPQSimulatorService {
 
 export const tpmSimulatorService = new CPQSimulatorService('/api/v1/tpm-simulator');
 export const sourcingSimulatorService = new CPQSimulatorService('/api/v1/sourcing-simulator');
+export const bssSimulatorService = new CPQSimulatorService('/api/v1/bss-simulator');
+export const nssSimulatorService = new CPQSimulatorService('/api/v1/nss-simulator');
+export const ossSimulatorService = new CPQSimulatorService('/api/v1/oss-simulator');
+export const telcoGoldenSimulatorService = new CPQSimulatorService('/api/v1/telco-golden-simulator');
+
+export async function seedAllTelco(): Promise<{ success: boolean; message: string; results: Record<string, unknown> }> {
+  let base = '';
+  try {
+    const res = await fetch('/config.json', { cache: 'no-store' });
+    if (res.ok) {
+      const cfg = await res.json();
+      base = cfg.api?.baseUrl || '';
+    }
+  } catch {
+    /* relative URL */
+  }
+  const res = await fetch(`${base}/api/v1/telco/seed-all`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `Seed all failed: ${res.status}`);
+  }
+  return res.json();
+}
 
 export type { CPQSimulatorService };

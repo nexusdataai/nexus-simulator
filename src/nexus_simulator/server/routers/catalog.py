@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter(prefix="/api/v1/simulators", tags=["simulators"])
 
-_PRIMARY = ("sfdc", "oracle", "sap", "external", "tpm", "sourcing")
+_PRIMARY = ("sfdc", "oracle", "sap", "external", "tpm", "sourcing", "bss", "nss", "oss", "telco_golden")
 
 
 @router.get("")

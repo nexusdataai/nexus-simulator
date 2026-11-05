@@ -62,10 +62,24 @@ src/nexus_simulator/
     oracle_erp/      # Oracle ERP simulator + models
     sap/             # SAP simulator + models
     external_source/ # Google Drive / Social Listening / Uploads simulator
+    bss/ nss/ oss/   # Telecom BSS / NSS / OSS source simulators
+    telco_golden/    # CustomerGolden rollup from BSS+NSS+OSS
+    telco_seed_pools.py  # Shared subscriber/cell topology + personas
+  telco_golden/      # rollup + dump_writer for CustomerGolden
   adapters/          # DynamoDB, S3, Redis, in-memory shipped adapters
   server/            # Reference FastAPI app + per-plugin routers + MCP + CLI
   testing/           # make_test_app, SeedYAMLRunner, pytest fixtures plugin
 ```
+
+### Telecom BSS / NSS / OSS + Customer Golden
+
+Enabled by default when serving (`BSS_SIMULATOR_ENABLED` etc. default true). Seed all four in order:
+
+```bash
+curl -X POST http://localhost:8002/api/v1/telco/seed-all
+```
+
+Or open the simulator UI overview and click **Seed all telco**. See [docs/telecom_data_sources.md](docs/telecom_data_sources.md) for source tables, golden columns, and case-study personas.
 
 ## Quickstart — local reference server
 

@@ -23,6 +23,11 @@ _SOURCE_ALIASES = {
     "social_listening": "external",
     "tpm": "tpm",
     "sourcing": "sourcing",
+    "bss": "bss",
+    "nss": "nss",
+    "oss": "oss",
+    "telco_golden": "telco_golden",
+    "telco-golden": "telco_golden",
 }
 
 
@@ -36,7 +41,7 @@ def _registry(request: Request):
 def _pick(request: Request, source: Optional[str]):
     registry = _registry(request)
     if not source:
-        for name in ("sfdc", "oracle", "sap", "external", "tpm", "sourcing"):
+        for name in ("sfdc", "oracle", "sap", "external", "tpm", "sourcing", "bss", "nss", "oss", "telco_golden"):
             svc = registry.get(name)
             if svc is not None:
                 return svc

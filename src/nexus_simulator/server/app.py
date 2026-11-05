@@ -10,14 +10,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .. import __version__
 from . import connector_runtime
+from .routers import bss as bss_router
 from .routers import catalog as catalog_router
 from .routers import external as external_router
 from .routers import fdw as fdw_router
 from .routers import health as health_router
+from .routers import nss as nss_router
 from .routers import oracle_erp as oracle_erp_router
+from .routers import oss as oss_router
 from .routers import sap as sap_router
 from .routers import sfdc as sfdc_router
 from .routers import sourcing as sourcing_router
+from .routers import telco as telco_router
+from .routers import telco_golden as telco_golden_router
 from .routers import tpm as tpm_router
 from .routers import wxcc as wxcc_router
 from .routers.connectors import external_connector_api
@@ -39,6 +44,10 @@ SAP_PREFIX = "/api/v1/sap-simulator"
 EXTERNAL_PREFIX = "/api/v1/external-simulator"
 TPM_PREFIX = "/api/v1/tpm-simulator"
 SOURCING_PREFIX = "/api/v1/sourcing-simulator"
+BSS_PREFIX = "/api/v1/bss-simulator"
+NSS_PREFIX = "/api/v1/nss-simulator"
+OSS_PREFIX = "/api/v1/oss-simulator"
+TELCO_GOLDEN_PREFIX = "/api/v1/telco-golden-simulator"
 
 
 def create_app(simulator: Any | None = None, *, cors_origins: list[str] | None = None) -> FastAPI:
@@ -74,6 +83,11 @@ def create_app(simulator: Any | None = None, *, cors_origins: list[str] | None =
     app.include_router(external_router.router, prefix=EXTERNAL_PREFIX, tags=["External Simulator"])
     app.include_router(tpm_router.router, prefix=TPM_PREFIX, tags=["TPM Simulator"])
     app.include_router(sourcing_router.router, prefix=SOURCING_PREFIX, tags=["Sourcing Simulator"])
+    app.include_router(bss_router.router, prefix=BSS_PREFIX, tags=["BSS Simulator"])
+    app.include_router(nss_router.router, prefix=NSS_PREFIX, tags=["NSS Simulator"])
+    app.include_router(oss_router.router, prefix=OSS_PREFIX, tags=["OSS Simulator"])
+    app.include_router(telco_golden_router.router, prefix=TELCO_GOLDEN_PREFIX, tags=["Telco Golden Simulator"])
+    app.include_router(telco_router.router)
     app.include_router(sfdc_connector_api.router)
     app.include_router(oracle_erp_connector_api.router)
     app.include_router(sap_connector_api.router)
@@ -89,7 +103,7 @@ def create_app(simulator: Any | None = None, *, cors_origins: list[str] | None =
         if simulator is None:
             return
         for name, svc in simulator.registry.all().items():
-            if name in ("simulator", "oracle_erp", "external_source"):
+            if name in ("simulator", "oracle_erp", "external_source", "bss", "nss", "oss", "telco_golden"):
                 continue
             try:
                 if hasattr(svc, "ensure_loaded"):
@@ -107,6 +121,28 @@ def create_app(simulator: Any | None = None, *, cors_origins: list[str] | None =
                 )
             except Exception:
                 logger.exception("simulator plugin hydrate failed: %s", name)
+
+        # Telco plugins hydrate in dependency order: BSS → NSS → OSS → golden.
+        for name in ("bss", "nss", "oss", "telco_golden"):
+            svc = simulator.registry.get(name)
+            if svc is None:
+                continue
+            try:
+                if hasattr(svc, "ensure_loaded"):
+                    await svc.ensure_loaded()
+                if not getattr(svc, "loaded", False) and hasattr(svc, "seed_data"):
+                    await svc.seed_data()
+                if hasattr(svc, "rebuild_catalog_from_cache"):
+                    await svc.rebuild_catalog_from_cache()
+                logger.info(
+                    "telco plugin ready: %s loaded=%s tables=%s rows=%s",
+                    name,
+                    getattr(svc, "loaded", False),
+                    getattr(svc, "_tables", None) and len(svc._tables),
+                    getattr(svc, "_total_rows", None),
+                )
+            except Exception:
+                logger.exception("telco ordered hydrate failed: %s", name)
 
     logger.info("Nexus Simulator app created (version %s)", __version__)
     return app

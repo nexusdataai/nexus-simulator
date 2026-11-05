@@ -1,0 +1,8 @@
+{
+  "prefix": "telco-golden-simulator",
+  "schema": "telco_intelligence",
+  "server": "telco_golden_simulator",
+  "dump_timestamp": "2026-11-05T16:06:39.371275+00:00",
+  "total_tables": 1,
+  "total_rows_dumped": 20
+}

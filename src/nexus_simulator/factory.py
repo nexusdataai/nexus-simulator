@@ -60,6 +60,10 @@ class Simulator:
     external_source: Any | None = None
     tpm: Any | None = None
     sourcing: Any | None = None
+    bss: Any | None = None
+    nss: Any | None = None
+    oss: Any | None = None
+    telco_golden: Any | None = None
 
 
 def _build_cache(config: SimulatorConfig) -> CacheBackend:
@@ -178,6 +182,46 @@ def build_simulator(config: SimulatorConfig) -> Simulator:
         )
         sim.sourcing = sourcing
         registry.register("sourcing", sourcing)
+
+    if config.bss is not None:
+        from .plugins.bss import BSSSimulatorService
+
+        bss = BSSSimulatorService(bucket=config.bss.bucket, prefix=config.bss.prefix)
+        bss._cache = cache
+        bss._storage = _build_storage(config.bss.bucket, config.bss.prefix, config.region)
+        sim.bss = bss
+        registry.register("bss", bss)
+
+    if config.nss is not None:
+        from .plugins.nss import NSSSimulatorService
+
+        nss = NSSSimulatorService(bucket=config.nss.bucket, prefix=config.nss.prefix)
+        nss._cache = cache
+        nss._storage = _build_storage(config.nss.bucket, config.nss.prefix, config.region)
+        sim.nss = nss
+        registry.register("nss", nss)
+
+    if config.oss is not None:
+        from .plugins.oss import OSSSimulatorService
+
+        oss = OSSSimulatorService(bucket=config.oss.bucket, prefix=config.oss.prefix)
+        oss._cache = cache
+        oss._storage = _build_storage(config.oss.bucket, config.oss.prefix, config.region)
+        sim.oss = oss
+        registry.register("oss", oss)
+
+    if config.telco_golden is not None:
+        from .plugins.telco_golden import TelcoGoldenSimulatorService
+
+        golden = TelcoGoldenSimulatorService(
+            bucket=config.telco_golden.bucket, prefix=config.telco_golden.prefix
+        )
+        golden._cache = cache
+        golden._storage = _build_storage(
+            config.telco_golden.bucket, config.telco_golden.prefix, config.region
+        )
+        sim.telco_golden = golden
+        registry.register("telco_golden", golden)
 
     # Out-of-tree plugins registered via register_simulator() are wired last
     # so they cannot accidentally collide with the in-tree set on the same

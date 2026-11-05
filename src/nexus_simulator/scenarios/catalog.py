@@ -17,6 +17,10 @@ PLUGIN_FALLBACK_SCHEMA = {
     "external": "external_sources",
     "tpm": "tpm_cpq",
     "sourcing": "sourcing_cpq",
+    "bss": "bss_crm",
+    "nss": "nss_core",
+    "oss": "oss_network",
+    "telco_golden": "telco_intelligence",
 }
 
 

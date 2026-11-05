@@ -35,13 +35,17 @@ def _build_simulator_config():
     var is set; that gates which plugins activate at startup.
     """
     from ..config import (
+        BSSPluginConfig,
         ExternalSourcePluginConfig,
+        NSSPluginConfig,
+        OSSPluginConfig,
         OracleERPPluginConfig,
         SAPPluginConfig,
         SFDCPluginConfig,
         SourcingPluginConfig,
         SimulatorConfig,
         TPMPluginConfig,
+        TelcoGoldenPluginConfig,
         WXCCPluginConfig,
     )
 
@@ -106,6 +110,38 @@ def _build_simulator_config():
             prefix=os.environ.get("SOURCING_SIMULATOR_PREFIX", "sourcing-simulator"),
         )
 
+    def _bss():
+        if os.environ.get("BSS_SIMULATOR_ENABLED", "true").lower() == "false":
+            return None
+        return BSSPluginConfig(
+            bucket=os.environ.get("BSS_SIMULATOR_BUCKET", ""),
+            prefix=os.environ.get("BSS_SIMULATOR_PREFIX", "bss-simulator"),
+        )
+
+    def _nss():
+        if os.environ.get("NSS_SIMULATOR_ENABLED", "true").lower() == "false":
+            return None
+        return NSSPluginConfig(
+            bucket=os.environ.get("NSS_SIMULATOR_BUCKET", ""),
+            prefix=os.environ.get("NSS_SIMULATOR_PREFIX", "nss-simulator"),
+        )
+
+    def _oss():
+        if os.environ.get("OSS_SIMULATOR_ENABLED", "true").lower() == "false":
+            return None
+        return OSSPluginConfig(
+            bucket=os.environ.get("OSS_SIMULATOR_BUCKET", ""),
+            prefix=os.environ.get("OSS_SIMULATOR_PREFIX", "oss-simulator"),
+        )
+
+    def _telco_golden():
+        if os.environ.get("TELCO_GOLDEN_SIMULATOR_ENABLED", "true").lower() == "false":
+            return None
+        return TelcoGoldenPluginConfig(
+            bucket=os.environ.get("TELCO_GOLDEN_SIMULATOR_BUCKET", ""),
+            prefix=os.environ.get("TELCO_GOLDEN_SIMULATOR_PREFIX", "telco-golden-simulator"),
+        )
+
     return SimulatorConfig(
         region=os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION"),
         role_arn=os.environ.get("AWS_ROLE_ARN"),
@@ -117,6 +153,10 @@ def _build_simulator_config():
         external_source=_external_source(),
         tpm=_tpm(),
         sourcing=_sourcing(),
+        bss=_bss(),
+        nss=_nss(),
+        oss=_oss(),
+        telco_golden=_telco_golden(),
     )
 
 

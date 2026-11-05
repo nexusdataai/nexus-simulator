@@ -27,7 +27,19 @@ async def run_step(registry, spec: dict[str, Any], step: dict[str, Any], ctx: di
 
 
 def _load():
-    from . import c360, demand, esg, inventory, o2c, procurement, production, risk, sourcing, trade  # noqa: F401
+    from . import (  # noqa: F401
+        c360,
+        demand,
+        esg,
+        inventory,
+        o2c,
+        procurement,
+        production,
+        risk,
+        sourcing,
+        telco,
+        trade,
+    )
 
 
 _load()

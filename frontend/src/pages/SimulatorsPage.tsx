@@ -6,11 +6,40 @@ import { OracleERPSimulatorPanel } from '@/components/oracle-erp-simulator';
 import { SAPSimulatorPanel } from '@/components/sap-simulator';
 import { ExternalSimulatorPanel } from '@/components/external-simulator';
 import { CPQSimulatorPanel } from '@/components/cpq-simulator/CPQSimulatorPanel';
-import { tpmSimulatorService, sourcingSimulatorService } from '@/services/cpqSimulatorService';
+import { TelcoSimulatorPanel } from '@/components/telco-simulator';
+import {
+  tpmSimulatorService,
+  sourcingSimulatorService,
+  bssSimulatorService,
+  nssSimulatorService,
+  ossSimulatorService,
+  telcoGoldenSimulatorService,
+} from '@/services/cpqSimulatorService';
 import { cn } from '@/lib/utils';
-import { Database, Building2, Factory, Globe, Receipt, ClipboardList } from 'lucide-react';
+import {
+  Database,
+  Building2,
+  Factory,
+  Globe,
+  Receipt,
+  ClipboardList,
+  Smartphone,
+  Signal,
+  Server,
+  Sparkles,
+} from 'lucide-react';
 
-type Tab = 'sfdc' | 'oracle-erp' | 'sap' | 'external' | 'tpm' | 'sourcing';
+type Tab =
+  | 'sfdc'
+  | 'oracle-erp'
+  | 'sap'
+  | 'external'
+  | 'tpm'
+  | 'sourcing'
+  | 'bss'
+  | 'nss'
+  | 'oss'
+  | 'telco-golden';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'sfdc', label: 'Salesforce Simulator', icon: Database },
@@ -19,6 +48,10 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'external', label: 'External Sources', icon: Globe },
   { id: 'tpm', label: 'TPM Simulator (Trade CPQ)', icon: Receipt },
   { id: 'sourcing', label: 'Sourcing Simulator (Buy CPQ)', icon: ClipboardList },
+  { id: 'bss', label: 'BSS Simulator', icon: Smartphone },
+  { id: 'nss', label: 'NSS Simulator', icon: Signal },
+  { id: 'oss', label: 'OSS Simulator', icon: Server },
+  { id: 'telco-golden', label: 'Telco Golden', icon: Sparkles },
 ];
 
 const TAB_BY_ID: Record<string, Tab> = {
@@ -29,6 +62,11 @@ const TAB_BY_ID: Record<string, Tab> = {
   external: 'external',
   tpm: 'tpm',
   sourcing: 'sourcing',
+  bss: 'bss',
+  nss: 'nss',
+  oss: 'oss',
+  'telco-golden': 'telco-golden',
+  telco_golden: 'telco-golden',
 };
 
 export default function SimulatorsPage() {
@@ -45,7 +83,6 @@ export default function SimulatorsPage() {
   return (
     <Layout>
       <div className="h-full flex flex-col">
-        {/* Tab bar */}
         <div className="border-b px-1">
           <nav className="flex gap-1 overflow-x-auto" aria-label="Simulator tabs">
             {TABS.map(tab => {
@@ -73,7 +110,6 @@ export default function SimulatorsPage() {
           </nav>
         </div>
 
-        {/* Tab content */}
         <div className="flex-1 overflow-auto">
           {activeTab === 'sfdc' && <SFDCSimulatorPanel />}
           {activeTab === 'oracle-erp' && <OracleERPSimulatorPanel />}
@@ -91,6 +127,34 @@ export default function SimulatorsPage() {
               service={sourcingSimulatorService}
               title="Sourcing Simulator"
               subtitle="SAP Ariba-style sourcing simulator — backs the buy-side Sourcing CPQ module (RFx_Event, Vendor_Quote, Sourcing_Scenario, Should_Cost_Model)"
+            />
+          )}
+          {activeTab === 'bss' && (
+            <TelcoSimulatorPanel
+              service={bssSimulatorService}
+              title="BSS Simulator"
+              subtitle="Business Support Systems — CRM, billing, care, campaigns, MNP (schema bss_crm)"
+            />
+          )}
+          {activeTab === 'nss' && (
+            <TelcoSimulatorPanel
+              service={nssSimulatorService}
+              title="NSS Simulator"
+              subtitle="Network Switching Subsystem — usage aggregates, QoE, attach/VoLTE failures, policy throttle (schema nss_core)"
+            />
+          )}
+          {activeTab === 'oss' && (
+            <TelcoSimulatorPanel
+              service={ossSimulatorService}
+              title="OSS Simulator"
+              subtitle="Operations Support Systems — cell KPIs, alarms, maintenance, trouble tickets (schema oss_network)"
+            />
+          )}
+          {activeTab === 'telco-golden' && (
+            <TelcoSimulatorPanel
+              service={telcoGoldenSimulatorService}
+              title="Telco Customer Golden"
+              subtitle="Rolled-up CustomerGolden snapshot from BSS + NSS + OSS (telco_intelligence.Telco_Customer_Gold_Data)"
             />
           )}
         </div>

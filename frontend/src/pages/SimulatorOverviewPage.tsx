@@ -1,7 +1,20 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
-import { Database, Building2, Factory, Globe, Receipt, ClipboardList } from "lucide-react";
+import {
+  Database,
+  Building2,
+  Factory,
+  Globe,
+  Receipt,
+  ClipboardList,
+  Smartphone,
+  Signal,
+  Server,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
+import { seedAllTelco } from "@/services/cpqSimulatorService";
 
 type SimItem = {
   service: string;
@@ -20,14 +33,20 @@ const META: Record<string, { label: string; path: string; icon: React.ElementTyp
   external: { label: "External Sources", path: "/simulators/external", icon: Globe },
   tpm: { label: "TPM Trade CPQ", path: "/simulators/tpm", icon: Receipt },
   sourcing: { label: "Sourcing Buy CPQ", path: "/simulators/sourcing", icon: ClipboardList },
+  bss: { label: "BSS Telecom", path: "/simulators/bss", icon: Smartphone },
+  nss: { label: "NSS Telecom", path: "/simulators/nss", icon: Signal },
+  oss: { label: "OSS Telecom", path: "/simulators/oss", icon: Server },
+  telco_golden: { label: "Telco Golden", path: "/simulators/telco-golden", icon: Sparkles },
 };
 
 export default function SimulatorOverviewPage() {
   const nav = useNavigate();
   const [items, setItems] = useState<SimItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [seeding, setSeeding] = useState(false);
+  const [seedMsg, setSeedMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+  const refresh = () => {
     fetch("/api/v1/simulators")
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -35,17 +54,47 @@ export default function SimulatorOverviewPage() {
       })
       .then((body) => setItems(body.items || []))
       .catch((err) => setError(String(err.message || err)));
+  };
+
+  useEffect(() => {
+    refresh();
   }, []);
+
+  const onSeedAllTelco = async () => {
+    setSeeding(true);
+    setSeedMsg(null);
+    try {
+      const res = await seedAllTelco();
+      setSeedMsg(res.message);
+      refresh();
+    } catch (err) {
+      setSeedMsg(String((err as Error).message || err));
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   return (
     <Layout>
       <div className="p-6 space-y-4">
-        <div>
-          <h2 className="text-xl font-semibold">Enterprise Data Simulators</h2>
-          <p className="text-sm text-muted-foreground">
-            FDW-compatible replicas hosted by nexus-simulator. Ontology and ReAct call this service over HTTP.
-          </p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-xl font-semibold">Enterprise Data Simulators</h2>
+            <p className="text-sm text-muted-foreground">
+              FDW-compatible replicas hosted by nexus-simulator. Ontology and ReAct call this service over HTTP.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onSeedAllTelco}
+            disabled={seeding}
+            className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-60"
+          >
+            {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            Seed all telco
+          </button>
         </div>
+        {seedMsg && <div className="text-sm text-muted-foreground">{seedMsg}</div>}
         {error && <div className="text-sm text-destructive">Failed to load catalog: {error}</div>}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {Object.entries(META).map(([key, meta]) => {
