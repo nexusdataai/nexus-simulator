@@ -201,15 +201,19 @@ The **default** telecom product surface is three FDW plugins: **BSS**, **NSS**, 
 | NSS | `nss_core` | `telco_atlas_nss` | `/api/v1/nss-simulator` | `nss` |
 | OSS | `oss_network` | `telco_atlas_oss` | `/api/v1/oss-simulator` | `oss` |
 
-**Backbone APIs (per layer):** `GET /api/v1/{bss|nss|oss}-simulator/backbone/catalog`, `POST .../backbone/generate`, `GET .../backbone/artifacts`, `GET .../backbone/files`, `GET .../backbone/file?path=...`, SSE `GET .../backbone/stream/{topic}`. The reference atlas HTML is served at `/telco-atlas/`.
+**Backbone APIs (per layer):** `GET /api/v1/{bss|nss|oss}-simulator/backbone/catalog`, `POST .../backbone/generate`, `GET .../backbone/artifacts`, `GET .../backbone/files`, `GET .../backbone/file?path=...`, `GET .../backbone/vendor-catalog`, **vendor REST** `GET|POST .../vendor-api/{path}` (paths are normalized from fixtures: `/tmf-api/...` in `samples.js` becomes `/vendor-api/...` on the simulator), SSE `GET .../backbone/stream/{topic}` for replay in dev. The reference atlas HTML is served at `/telco-atlas/`.
+
+**Durable output (when the plugin has an S3/MinIO bucket):** each generate writes `telco-backbone/{layer}/{run_id}/manifest.json`, `files/…` (file delivery), `apis/*.json` (API bodies), and `tables/{schema}/{table}.json` (row exports). **Tables** also remain in **Redis** for FDW query. Without a bucket, files and APIs are served from Redis only.
+
+**Stream publish:** `TELCO_STREAM_SINK=none` (default) keeps events in Redis + SSE; set `TELCO_STREAM_SINK=redis_stream` and `REDIS_URL` to **XADD** each event to streams named `telco:backbone:{layer}:{topic}` (topic characters sanitized).
+
+**TMF gateway:** `GET /tmf-api/*` is only populated when the legacy **`telco_sources`** plugin is enabled (ontology may front vendor APIs separately). **BSS/NSS/OSS backbone** vendor payloads are **not** merged into `/tmf-api` — use **`/api/v1/{layer}-simulator/vendor-api/...`** instead.
 
 **Ordered seed:** `POST /api/v1/telco/seed-all` runs **BSS → NSS → OSS** by default. Optional query params `include_golden=true` and/or `include_sources=true` add `telco_golden` and/or `telco_sources` when those plugins are enabled in config.
 
 **Env knobs:** `TELCO_SUBSCRIBERS` (default 500), `TELCO_CELLS` (100), `TELCO_HISTORY_DAYS` (60), `TELCO_SEED` (42). Plan-scale demo: `TELCO_SUBSCRIBERS=5000 TELCO_CELLS=500 TELCO_HISTORY_DAYS=90`. Disable layers with `BSS_SIMULATOR_ENABLED=false` (and NSS/OSS equivalents).
 
 **FDW:** `GET /api/fdw/tables?source=bss|nss|oss` (plus `telco_golden` or `telco_sources` when registered).
-
-**TMF index:** merged from backbone generation across the three layers; `GET /tmf-api/*` resolves stored bodies.
 
 **Scenarios:** `telco.usage-decline`, `telco.churn-portout`, `telco.upsell-ready`, `telco.policy-throttle` under `scenarios/catalog/telco-customer-intelligence.yaml`. The `source-outage` step calls `seed_scenario("outage_backhaul")` on **OSS** or **NSS** (or legacy `telco_sources` when present).
 

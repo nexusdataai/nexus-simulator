@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-import os
+import uuid
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from loguru import logger
@@ -11,6 +12,8 @@ from loguru import logger
 from nexus_simulator.plugins.telco_seed_pools import TelcoPools, get_telco_pools, telco_rng_seed
 from nexus_simulator.telco_backbone.fixtures import load_sample_fixtures
 from nexus_simulator.telco_backbone.generate import generate_layer_backbone
+from nexus_simulator.telco_backbone.stream_publisher import publish_backbone_streams
+from nexus_simulator.telco_backbone.vendor_paths import vendor_lookup_key
 
 if TYPE_CHECKING:
     from nexus_simulator.base.simulator import BaseSimulator
@@ -46,6 +49,22 @@ class TelcoBackboneMixin:
             su, f"telco_atlas_{su.lower()}"
         )
 
+    def _backbone_s3_base(self, run_id: str) -> str:
+        """Relative key prefix under plugin storage (no trailing slash)."""
+        layer = self._layer_upper().lower()
+        return f"telco-backbone/{layer}/{run_id}"
+
+    async def _clear_backbone_artifacts(self) -> int:
+        """Remove backbone keys from cache (run state, files, vendor index)."""
+        n = 0
+        n += await self.cache.flush_prefix(self._meta_prefix())
+        n += await self.cache.flush_prefix(f"telco_backbone:file:{self.SERVICE_NAME}:")
+        return n
+
+    async def reset(self) -> dict[str, Any]:  # type: ignore[override]
+        await self._clear_backbone_artifacts()
+        return await super().reset()
+
     async def get_backbone_catalog(self) -> dict[str, Any]:
         bundle = load_sample_fixtures()
         layer = self._layer_upper()
@@ -61,6 +80,98 @@ class TelcoBackboneMixin:
             ],
         }
 
+    async def _write_backbone_to_storage(
+        self,
+        run_id: str,
+        generated_at: str,
+        backbone: dict[str, Any],
+        merged_schemas: dict[str, dict[str, List[dict]]],
+    ) -> dict[str, Any]:
+        """Write manifest, files, API bodies, and table exports to S3 when bucket configured."""
+        base = self._backbone_s3_base(run_id)
+        storage = getattr(self, "_storage", None)
+        bucket = getattr(self, "bucket", None) or ""
+        if storage is None or not bucket:
+            return {"s3_enabled": False}
+
+        out: dict[str, Any] = {"s3_enabled": True, "base_key": f"s3://{bucket}/{self.prefix}/{base}" if self.prefix else f"s3://{bucket}/{base}", "run_id": run_id}
+
+        ensure = getattr(storage, "ensure_bucket", None)
+        if callable(ensure):
+            await ensure()
+
+        # Files
+        files_written = 0
+        for f in backbone.get("files") or []:
+            rel = str(f.get("path") or "").lstrip("/")
+            content = str(f.get("content") or "")
+            key = f"{base}/files/{rel}"
+            await storage.put_bytes(key, content.encode("utf-8"))
+            files_written += 1
+
+        # API bodies as JSON files + enriched vendor index
+        vendor_src = dict(backbone.get("vendor_api_index") or {})
+        api_idx_out: dict[str, Any] = {}
+        apis_written = 0
+        used_safe: set[str] = set()
+        for lk, entry in vendor_src.items():
+            if not isinstance(entry, dict):
+                continue
+            rp = str(entry.get("route_path") or "")
+            if not rp:
+                continue
+            safe = rp.replace("/", "_").strip("_")[:100] or "api"
+            orig = safe
+            n = 0
+            while safe in used_safe:
+                n += 1
+                safe = f"{orig}_{n}"
+            used_safe.add(safe)
+            body_key = f"{base}/apis/{safe}.json"
+            body = entry.get("body")
+            await storage.put_json(body_key, body if body is not None else {})
+            api_idx_out[lk] = {
+                **entry,
+                "body_s3_key": body_key,
+            }
+            apis_written += 1
+
+        # Table exports (all schemas in this seed)
+        tables_export: dict[str, Any] = {}
+        tbl_files = 0
+        for schema_name, data_map in merged_schemas.items():
+            for tname, rows in (data_map or {}).items():
+                tk = f"{base}/tables/{schema_name}/{tname}.json"
+                await storage.put_json(tk, rows)
+                tbl_files += 1
+                tables_export.setdefault(schema_name, {})[tname] = {"rows": len(rows or []), "s3_key": tk}
+
+        manifest = {
+            "run_id": run_id,
+            "generated_at": generated_at,
+            "layer": self._layer_upper(),
+            "service": self.SERVICE_NAME,
+            "bucket": bucket,
+            "prefix": self.prefix,
+            "base_relative": base,
+            "files_written": files_written,
+            "api_endpoints": apis_written,
+            "table_files": tbl_files,
+            "topics": list((backbone.get("streams") or {}).keys()),
+            "tables": tables_export,
+            "vendor_api_lookup_keys": list(api_idx_out.keys()),
+        }
+        manifest_key = f"{base}/manifest.json"
+        await storage.put_json(manifest_key, manifest)
+        out["manifest_key"] = manifest_key
+        out["vendor_api_index"] = api_idx_out
+        out["counts"] = {
+            "files": files_written,
+            "apis": apis_written,
+            "table_files": tbl_files,
+        }
+        return out
+
     async def generate_backbone(
         self,
         *,
@@ -69,15 +180,20 @@ class TelcoBackboneMixin:
         deliveries: Optional[Set[str]] = None,
         include_legacy_tables: bool = True,
     ) -> dict[str, Any]:
-        """Build atlas tables + files + tmf + streams; merge with optional legacy seed."""
+        """Build atlas tables + files + vendor API index + streams; merge with optional legacy seed."""
         layer = self._layer_upper()
         pool = pools or get_telco_pools(seed=telco_rng_seed())
         backbone = generate_layer_backbone(layer, pool, systems=systems, deliveries=deliveries)
 
-        await self._cache_set_json(self._meta_prefix() + "bundle", backbone)
+        run_id = str(uuid.uuid4())
+        generated_at = datetime.now(timezone.utc).isoformat()
+        backbone["run_id"] = run_id
+        backbone["generated_at"] = generated_at
 
-        # TMF paths are unique per samples
-        await self._cache_set_json(self._meta_prefix() + "tmf_index", backbone.get("tmf_index") or {})
+        await self._cache_set_json(self._meta_prefix() + "bundle", backbone)
+        await self._cache_set_json(self._meta_prefix() + "vendor_api_index", backbone.get("vendor_api_index") or {})
+        # Legacy key kept empty for BWC — /tmf-api no longer merges backbone from simulator
+        await self._cache_set_json(self._meta_prefix() + "tmf_index", {})
         await self._cache_set_json(self._meta_prefix() + "streams", backbone.get("streams") or {})
 
         files = backbone.get("files") or []
@@ -91,7 +207,6 @@ class TelcoBackboneMixin:
         atlas_schema = self._atlas_schema_name()
         atlas_tables: Dict[str, List[dict]] = dict(backbone.get("tables") or {})
 
-        # Merge with legacy tables in one catalog pass
         from importlib import import_module
 
         svc_name = self.SERVICE_NAME
@@ -108,21 +223,46 @@ class TelcoBackboneMixin:
         merged: Dict[str, Dict[str, List[dict]]] = {base_schema: legacy_map, atlas_schema: atlas_tables}
         server = getattr(self, "SERVER_NAME", f"{svc_name}_simulator")
         summary = await self._finalize_seed_multi(server, merged)
-        summary["backbone"] = {
+
+        s3_info = await self._write_backbone_to_storage(run_id, generated_at, backbone, merged)
+        enriched_va = s3_info.pop("vendor_api_index", None) if isinstance(s3_info, dict) else None
+        if enriched_va:
+            await self._cache_set_json(self._meta_prefix() + "vendor_api_index", enriched_va)
+            backbone["vendor_api_index"] = enriched_va
+
+        stream_pub: dict[str, Any] = {}
+        try:
+            stream_pub = await publish_backbone_streams(layer, dict(backbone.get("streams") or {}))
+        except Exception as e:  # noqa: BLE001
+            sim_logger.warning("Stream publish skipped: {}", e)
+            stream_pub = {"error": str(e)}
+
+        va = backbone.get("vendor_api_index") or {}
+        sm = summary
+        sm["backbone"] = {
+            "run_id": run_id,
+            "generated_at": generated_at,
             "systems": len(backbone.get("systems") or []),
             "tables": len(atlas_tables),
             "files": len(files),
-            "tmf_paths": len(backbone.get("tmf_index") or {}),
+            "vendor_api_paths": len(va),
             "stream_topics": len(backbone.get("streams") or {}),
+            "stream_publish": stream_pub,
+            "s3": s3_info,
+            "sample_vendor_api_path": (next(iter(va.values()), {}) or {}).get("route_path"),
         }
-        sim_logger.info("Backbone generated for {}: {}", layer, summary["backbone"])
-        return summary
+        sim_logger.info("Backbone generated for {}: {}", layer, sm["backbone"])
+        return sm
 
     async def get_backbone_artifacts(self) -> dict[str, Any]:
         return (await self._cache_get_json(self._meta_prefix() + "bundle")) or {}
 
+    async def get_vendor_api_index(self) -> dict[str, Any]:
+        return (await self._cache_get_json(self._meta_prefix() + "vendor_api_index")) or {}
+
     async def get_tmf_index(self) -> dict[str, Any]:
-        return (await self._cache_get_json(self._meta_prefix() + "tmf_index")) or {}
+        """Deprecated for backbone; returns empty. Legacy telco_sources may still expose TMF via router merge."""
+        return {}
 
     async def get_stream_topics(self) -> dict[str, List[dict]]:
         return (await self._cache_get_json(self._meta_prefix() + "streams")) or {}
@@ -130,7 +270,48 @@ class TelcoBackboneMixin:
     async def get_files_manifest(self) -> List[dict]:
         return (await self._cache_get_json(self._meta_prefix() + "files_manifest")) or []
 
+    async def resolve_vendor_api(self, method: str, route_suffix: str) -> Optional[dict[str, Any]]:
+        """route_suffix = path after /vendor-api/ (no leading slash)."""
+        idx = await self.get_vendor_api_index()
+        m = (method or "GET").upper()
+        path = route_suffix.lstrip("/")
+        lk = vendor_lookup_key(m, path)
+        entry = idx.get(lk)
+        if not entry:
+            lk_alt = vendor_lookup_key(m, route_suffix)
+            entry = idx.get(lk_alt)
+        if not entry and m == "GET":
+            for k, v in idx.items():
+                if not isinstance(v, dict):
+                    continue
+                if k.startswith("GET ") and path.endswith((v.get("route_path") or "").split("/")[-1]):
+                    entry = v
+                    break
+        if not entry:
+            return None
+        body_key = entry.get("body_s3_key")
+        storage = getattr(self, "_storage", None)
+        bucket = getattr(self, "bucket", None) or ""
+        if body_key and storage is not None and bucket:
+            data = await storage.get_json(str(body_key))
+            if data is not None:
+                return {"method": entry.get("method", m), "body": data, "route_path": entry.get("route_path")}
+        return {"method": entry.get("method", m), "body": entry.get("body"), "route_path": entry.get("route_path")}
+
     async def read_backbone_file(self, path: str) -> Optional[str]:
+        storage = getattr(self, "_storage", None)
+        b = getattr(self, "bucket", None) or ""
+        arts = await self.get_backbone_artifacts()
+        run_id = arts.get("run_id") if isinstance(arts, dict) else None
+        if storage is not None and b and run_id:
+            rel = path.lstrip("/")
+            sk = f"{self._backbone_s3_base(str(run_id))}/files/{rel}"
+            raw = await storage.get_bytes(sk)
+            if raw is not None:
+                try:
+                    return raw.decode("utf-8")
+                except UnicodeDecodeError:
+                    return None
         key = f"telco_backbone:file:{self.SERVICE_NAME}:{path}"
         raw = await self.cache.get(key)
         if isinstance(raw, str):
@@ -169,4 +350,6 @@ class TelcoBackboneMixin:
         if isinstance(bundle, dict):
             bundle["streams"] = streams
             await self._cache_set_json(self._meta_prefix() + "bundle", bundle)
-        return {"scenario": name, "stream_topics": list(streams.keys())}
+        layer = self._layer_upper()
+        pub = await publish_backbone_streams(layer, streams)
+        return {"scenario": name, "stream_topics": list(streams.keys()), "stream_publish": pub}

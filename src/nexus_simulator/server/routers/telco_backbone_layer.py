@@ -8,7 +8,7 @@ import urllib.parse
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from nexus_simulator.plugins.telco_seed_pools import clear_telco_pools_cache, get_telco_pools
@@ -73,6 +73,43 @@ def make_backbone_router(attr: str, registry_key: str, tag: str) -> APIRouter:
         if content is None:
             raise HTTPException(status_code=404, detail=f"file not found: {decoded}")
         return PlainTextResponse(content)
+
+    @router.get("/backbone/vendor-catalog", tags=[tag])
+    async def backbone_vendor_catalog(request: Request):
+        svc = _svc(request)
+        if not hasattr(svc, "get_vendor_api_index"):
+            raise HTTPException(status_code=501, detail="vendor API catalog not supported")
+        idx = await svc.get_vendor_api_index()
+        paths = []
+        for _k, ent in (idx or {}).items():
+            if not isinstance(ent, dict):
+                continue
+            rp = ent.get("route_path")
+            if rp:
+                paths.append(
+                    {
+                        "method": ent.get("method", "GET"),
+                        "route_path": rp,
+                        "system_key": ent.get("system_key"),
+                    }
+                )
+        return {"vendor_api_paths": paths, "total": len(paths)}
+
+    @router.api_route("/vendor-api/{full_path:path}", methods=["GET", "POST", "PATCH", "PUT", "DELETE"], tags=[tag])
+    async def backbone_vendor_api(request: Request, full_path: str):
+        svc = _svc(request)
+        if not hasattr(svc, "resolve_vendor_api"):
+            raise HTTPException(status_code=501, detail="vendor API not supported")
+        resolved = await svc.resolve_vendor_api(request.method, full_path)
+        if not resolved:
+            raise HTTPException(status_code=404, detail=f"vendor API not found: {request.method} /{full_path}")
+        exp_m = str(resolved.get("method", "GET")).upper()
+        if request.method != exp_m and not (request.method == "GET" and exp_m == "POST"):
+            raise HTTPException(status_code=405, detail=f"expected {exp_m}")
+        body = resolved.get("body")
+        if isinstance(body, (dict, list)):
+            return JSONResponse(content=body)
+        return JSONResponse(content=body if body is not None else {})
 
     @router.get("/backbone/stream/{topic:path}", tags=[tag])
     async def backbone_stream(request: Request, topic: str):

@@ -140,9 +140,56 @@ export function TelcoBackbonePanel({ apiBase }: Props) {
         ))}
       </div>
 
-      {lastSummary && (
-        <pre className="text-[11px] bg-muted p-2 rounded overflow-auto max-h-32">{JSON.stringify(lastSummary, null, 2)}</pre>
-      )}
+      {lastSummary && (() => {
+        const bb = (lastSummary.backbone as Record<string, unknown> | undefined) || {};
+        const runId = typeof bb.run_id === 'string' ? bb.run_id : null;
+        const s3 = bb.s3 as { s3_enabled?: boolean; base_key?: string } | undefined;
+        const samplePath = typeof bb.sample_vendor_api_path === 'string' ? bb.sample_vendor_api_path : null;
+        const vendorUrl =
+          samplePath != null && samplePath !== ''
+            ? `${apiBase}/vendor-api/${samplePath.replace(/^\//, '')}`
+            : null;
+        return (
+          <div className="text-xs space-y-2 border rounded-md p-3 bg-background">
+            <div className="font-medium text-sm">Last backbone run</div>
+            {runId && (
+              <div>
+                <span className="text-muted-foreground">run_id:</span>{' '}
+                <code className="text-[11px] break-all">{runId}</code>
+              </div>
+            )}
+            {s3?.s3_enabled && s3.base_key && (
+              <div>
+                <span className="text-muted-foreground">S3:</span>{' '}
+                <code className="text-[11px] break-all">{s3.base_key}</code>
+              </div>
+            )}
+            {!s3?.s3_enabled && (
+              <p className="text-muted-foreground">
+                No simulator bucket configured — artifacts are in Redis only. Set <code>BSS_SIMULATOR_BUCKET</code> / NSS / OSS for durable S3 layout.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
+              {typeof bb.tables === 'number' && <span>atlas tables: {bb.tables}</span>}
+              {typeof bb.files === 'number' && <span>files: {bb.files}</span>}
+              {typeof bb.vendor_api_paths === 'number' && <span>vendor APIs: {bb.vendor_api_paths}</span>}
+              {typeof bb.stream_topics === 'number' && <span>stream topics: {bb.stream_topics}</span>}
+            </div>
+            {vendorUrl && samplePath && (
+              <div>
+                <span className="text-muted-foreground">Sample vendor API: </span>
+                <a href={vendorUrl} className="text-primary text-[11px] break-all" target="_blank" rel="noreferrer">
+                  {vendorUrl}
+                </a>
+              </div>
+            )}
+            <details className="text-[11px]">
+              <summary className="cursor-pointer text-muted-foreground">Raw response</summary>
+              <pre className="mt-2 bg-muted p-2 rounded overflow-auto max-h-40">{JSON.stringify(lastSummary, null, 2)}</pre>
+            </details>
+          </div>
+        );
+      })()}
     </div>
   );
 }

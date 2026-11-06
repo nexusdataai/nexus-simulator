@@ -37,11 +37,11 @@ async def test_bss_backbone_generate_populates_streams_and_tmf():
     bb = summary["backbone"]
     assert bb["tables"] >= 1
     assert bb["files"] >= 1
-    assert bb["tmf_paths"] >= 1
+    assert bb["vendor_api_paths"] >= 1
     assert bb["stream_topics"] >= 1
 
-    tmf = await svc.get_tmf_index()
-    assert tmf
+    vidx = await svc.get_vendor_api_index()
+    assert vidx
 
     streams = await svc.get_stream_topics()
     assert streams

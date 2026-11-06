@@ -1,4 +1,9 @@
-"""TMF Open API read paths backed by BSS / NSS / OSS backbone caches."""
+"""TMF-style paths for optional legacy ``telco_sources`` data.
+
+BSS/NSS/OSS backbone API payloads are served under each plugin's
+``/vendor-api/...`` (see ``telco_backbone_layer``), not this router — ontology
+may map its own ``/tmf-api/*`` facade to those vendor routes when integrated.
+"""
 
 from __future__ import annotations
 
@@ -11,14 +16,6 @@ router = APIRouter(prefix="/tmf-api", tags=["TMF Telco"])
 
 async def _merged_tmf_index(sim: Any) -> dict[str, Any]:
     merged: dict[str, Any] = {}
-    for name in ("bss", "nss", "oss"):
-        svc = getattr(sim, name, None) or sim.registry.get(name)
-        if svc is None or not hasattr(svc, "get_tmf_index"):
-            continue
-        idx = await svc.get_tmf_index()
-        if isinstance(idx, dict):
-            for k, v in idx.items():
-                merged.setdefault(k, v)
     # Optional legacy telco_sources
     ts = getattr(sim, "telco_sources", None) or sim.registry.get("telco_sources")
     if ts is not None and hasattr(ts, "get_tmf_index"):
@@ -37,7 +34,10 @@ async def tmf_proxy(request: Request, full_path: str):
 
     index = await _merged_tmf_index(sim)
     if not index:
-        raise HTTPException(status_code=503, detail="no TMF backbone data — seed BSS/NSS/OSS first")
+        raise HTTPException(
+            status_code=503,
+            detail="no TMF data — enable telco_sources or use /api/v1/{bss|nss|oss}-simulator/vendor-api/ for backbone APIs",
+        )
 
     path = f"/tmf-api/{full_path}"
     if request.url.query:

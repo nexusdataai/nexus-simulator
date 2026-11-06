@@ -17,6 +17,7 @@ from nexus_simulator.telco_sources.identity import (
     trace_customer_internal,
 )
 from nexus_simulator.telco_backbone.fixtures import FixtureBundle, load_sample_fixtures
+from nexus_simulator.telco_backbone.vendor_paths import normalize_vendor_route_path, vendor_lookup_key
 
 
 def _sanitize_table_identifier(name: str) -> str:
@@ -105,7 +106,7 @@ def generate_layer_backbone(
 
     tables: Dict[str, List[dict]] = {}
     files: List[dict] = []
-    tmf_index: Dict[str, dict] = {}
+    vendor_api_index: Dict[str, dict] = {}
     streams: Dict[str, List[dict]] = {}
 
     for system_key, body in sys_map.items():
@@ -158,8 +159,16 @@ def generate_layer_backbone(
             path = str(a.get("path") or "")
             method = str(a.get("method") or "GET")
             api_body = _substitute_obj(copy.deepcopy(a.get("body") or {}), pools, ctx)
-            if path:
-                tmf_index[path] = {"method": method, "body": api_body, "system_key": system_key}
+            route_path = normalize_vendor_route_path(path)
+            if route_path:
+                lk = vendor_lookup_key(method, route_path)
+                vendor_api_index[lk] = {
+                    "method": method.upper(),
+                    "route_path": route_path,
+                    "body": api_body,
+                    "system_key": system_key,
+                    "fixture_path": path,
+                }
 
         if "Stream" in dfilter and dels.get("Stream"):
             s = dels["Stream"]
@@ -172,6 +181,6 @@ def generate_layer_backbone(
         "systems": list(sys_map.keys()),
         "tables": tables,
         "files": files,
-        "tmf_index": tmf_index,
+        "vendor_api_index": vendor_api_index,
         "streams": streams,
     }
