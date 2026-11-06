@@ -21,6 +21,15 @@ def _small_pools(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_backbone_catalog_has_vendors_and_merged_deliveries():
+    sim = build_simulator(SimulatorConfig(bss=BSSPluginConfig()))
+    cat = await sim.bss.get_backbone_catalog()
+    assert cat.get("vendors")
+    assert cat.get("vendor_default")
+    assert any(s.get("slug") for s in cat.get("systems", []))
+
+
+@pytest.mark.asyncio
 async def test_bss_backbone_generate_populates_streams_and_tmf():
     sim = build_simulator(
         SimulatorConfig(
@@ -45,6 +54,32 @@ async def test_bss_backbone_generate_populates_streams_and_tmf():
 
     streams = await svc.get_stream_topics()
     assert streams
+
+    summ = await svc.get_backbone_summary()
+    assert summ.get("run_id")
+    assert summ["tables"]
+    assert summ["apis"]
+    assert summ["files"]
+    assert summ["streams"]
+
+
+@pytest.mark.asyncio
+async def test_per_system_deliveries_limits_output():
+    sim = build_simulator(SimulatorConfig(bss=BSSPluginConfig()))
+    svc = sim.bss
+    pools = get_telco_pools()
+    summary = await svc.generate_backbone(
+        pools=pools,
+        include_legacy_tables=False,
+        systems={"CRM / customer master"},
+        system_deliveries={"CRM / customer master": {"Table"}},
+    )
+    bb = summary["backbone"]
+    summ = bb.get("summary") or await svc.get_backbone_summary()
+    assert summ["files"] == []
+    assert summ["streams"] == []
+    assert summ["apis"] == []
+    assert len(summ["tables"]) >= 1
 
 
 @pytest.mark.asyncio

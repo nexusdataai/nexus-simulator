@@ -201,7 +201,14 @@ The **default** telecom product surface is three FDW plugins: **BSS**, **NSS**, 
 | NSS | `nss_core` | `telco_atlas_nss` | `/api/v1/nss-simulator` | `nss` |
 | OSS | `oss_network` | `telco_atlas_oss` | `/api/v1/oss-simulator` | `oss` |
 
-**Backbone APIs (per layer):** `GET /api/v1/{bss|nss|oss}-simulator/backbone/catalog`, `POST .../backbone/generate`, `GET .../backbone/artifacts`, `GET .../backbone/files`, `GET .../backbone/file?path=...`, `GET .../backbone/vendor-catalog`, **vendor REST** `GET|POST .../vendor-api/{path}` (paths are normalized from fixtures: `/tmf-api/...` in `samples.js` becomes `/vendor-api/...` on the simulator), SSE `GET .../backbone/stream/{topic}` for replay in dev. The reference atlas HTML is served at `/telco-atlas/`.
+**Backbone APIs (per layer):**
+
+- `GET .../backbone/catalog` — systems with **slug** and **merged** delivery list (intersection of fixture + [`atlas_catalog.json`](../src/nexus_simulator/data/telco/atlas_catalog.json)), plus `vendors` map and `vendor_default` (by layer).
+- `POST .../backbone/generate` — body may include `systems`, **`system_deliveries`** (per family: which of `Table|File|API|Stream` to emit), and **`vendor_code`** (`H|N|E|A|S|O|X`); defaults to catalog `vendor_default` if omitted.
+- `GET .../backbone/summary` — structured **Tables / APIs / Files / Streams** lists for the last generated bundle (same shape as `backbone.summary` on generate response).
+- `GET .../backbone/artifacts`, `GET .../backbone/files`, `GET .../backbone/file?path=...`, `GET .../backbone/vendor-catalog`, **vendor REST** `GET|POST .../vendor-api/{path}` (paths normalized: `/tmf-api/...` in `samples.js` → `/vendor-api/...` on the simulator), SSE `GET .../backbone/stream/{topic}` for replay in dev.
+
+The Simulators UI (**BSS / NSS / OSS** tabs) uses the catalog matrix and POSTs `system_deliveries`; results show four cards (Tables, APIs, Files, Streams). Reference atlas HTML: `/telco-atlas/`.
 
 **Durable output (when the plugin has an S3/MinIO bucket):** each generate writes `telco-backbone/{layer}/{run_id}/manifest.json`, `files/…` (file delivery), `apis/*.json` (API bodies), and `tables/{schema}/{table}.json` (row exports). **Tables** also remain in **Redis** for FDW query. Without a bucket, files and APIs are served from Redis only.
 

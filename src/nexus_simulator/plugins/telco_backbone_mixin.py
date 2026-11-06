@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 from loguru import logger
 
 from nexus_simulator.plugins.telco_seed_pools import TelcoPools, get_telco_pools, telco_rng_seed
+from nexus_simulator.telco_backbone.atlas_catalog import default_vendor_for_layer, load_atlas_catalog
 from nexus_simulator.telco_backbone.fixtures import load_sample_fixtures
 from nexus_simulator.telco_backbone.generate import generate_layer_backbone
 from nexus_simulator.telco_backbone.stream_publisher import publish_backbone_streams
@@ -67,17 +68,35 @@ class TelcoBackboneMixin:
 
     async def get_backbone_catalog(self) -> dict[str, Any]:
         bundle = load_sample_fixtures()
+        atlas = load_atlas_catalog()
         layer = self._layer_upper()
+        lk = layer.lower()
         systems = bundle.systems_for_layer(layer)
-        return {
-            "layer": layer,
-            "systems": [
+        atlas_for_layer = atlas.systems_for_layer(layer)
+        rows = []
+        for k, v in sorted(systems.items(), key=lambda x: x[0].lower()):
+            fx_del = list((v.get("deliveries") or {}).keys())
+            ar = atlas_for_layer.get(k)
+            slug = str(ar.get("slug") or "") if ar else ""
+            av = list(ar.get("deliveries") or []) if ar else []
+            if av:
+                merged = sorted(set(fx_del) & set(av))
+                if not merged:
+                    merged = sorted(fx_del)
+            else:
+                merged = sorted(fx_del)
+            rows.append(
                 {
                     "system_key": k,
-                    "deliveries": list((v.get("deliveries") or {}).keys()),
+                    "slug": slug,
+                    "deliveries": merged,
                 }
-                for k, v in systems.items()
-            ],
+            )
+        return {
+            "layer": layer,
+            "vendors": dict(atlas.vendors),
+            "vendor_default": default_vendor_for_layer(lk),
+            "systems": rows,
         }
 
     async def _write_backbone_to_storage(
@@ -178,17 +197,39 @@ class TelcoBackboneMixin:
         pools: Optional[TelcoPools] = None,
         systems: Optional[Set[str]] = None,
         deliveries: Optional[Set[str]] = None,
+        system_deliveries: Optional[Dict[str, Set[str]]] = None,
+        vendor_code: Optional[str] = None,
         include_legacy_tables: bool = True,
     ) -> dict[str, Any]:
         """Build atlas tables + files + vendor API index + streams; merge with optional legacy seed."""
         layer = self._layer_upper()
+        svc_name = self.SERVICE_NAME
         pool = pools or get_telco_pools(seed=telco_rng_seed())
-        backbone = generate_layer_backbone(layer, pool, systems=systems, deliveries=deliveries)
+        vid = (vendor_code or "").strip().upper()[:1] or default_vendor_for_layer(svc_name)
+        sys_arg = systems
+        sd = system_deliveries
+        if sd:
+            keys = set(sd.keys())
+            sys_arg = sys_arg.union(keys) if sys_arg is not None else keys
+        del_arg = deliveries
+        if sd and not del_arg:
+            del_arg = None
+        backbone = generate_layer_backbone(
+            layer,
+            pool,
+            systems=sys_arg,
+            deliveries=del_arg,
+            system_deliveries=sd,
+            vendor_code=vid,
+        )
 
         run_id = str(uuid.uuid4())
         generated_at = datetime.now(timezone.utc).isoformat()
         backbone["run_id"] = run_id
         backbone["generated_at"] = generated_at
+        backbone["vendor_code"] = vid
+        atlas_c = load_atlas_catalog()
+        backbone["vendor_label"] = atlas_c.vendors.get(vid, vid)
 
         await self._cache_set_json(self._meta_prefix() + "bundle", backbone)
         await self._cache_set_json(self._meta_prefix() + "vendor_api_index", backbone.get("vendor_api_index") or {})
@@ -209,7 +250,6 @@ class TelcoBackboneMixin:
 
         from importlib import import_module
 
-        svc_name = self.SERVICE_NAME
         build_fn_name = f"build_{svc_name}_tables"
         mod = import_module(f"nexus_simulator.plugins.{svc_name}.tables")
         build_fn = getattr(mod, build_fn_name)
@@ -238,10 +278,13 @@ class TelcoBackboneMixin:
             stream_pub = {"error": str(e)}
 
         va = backbone.get("vendor_api_index") or {}
+        summary_detail = await self.get_backbone_summary()
         sm = summary
         sm["backbone"] = {
             "run_id": run_id,
             "generated_at": generated_at,
+            "vendor_code": vid,
+            "vendor_label": backbone.get("vendor_label"),
             "systems": len(backbone.get("systems") or []),
             "tables": len(atlas_tables),
             "files": len(files),
@@ -250,12 +293,83 @@ class TelcoBackboneMixin:
             "stream_publish": stream_pub,
             "s3": s3_info,
             "sample_vendor_api_path": (next(iter(va.values()), {}) or {}).get("route_path"),
+            "summary": summary_detail,
         }
         sim_logger.info("Backbone generated for {}: {}", layer, sm["backbone"])
         return sm
 
     async def get_backbone_artifacts(self) -> dict[str, Any]:
         return (await self._cache_get_json(self._meta_prefix() + "bundle")) or {}
+
+    async def get_backbone_summary(self) -> dict[str, Any]:
+        """Structured view for UI: Tables / APIs / Files / Streams."""
+        bundle = await self.get_backbone_artifacts()
+        if not bundle:
+            return {
+                "layer": self._layer_upper(),
+                "run_id": None,
+                "generated_at": None,
+                "vendor_code": None,
+                "vendor_label": None,
+                "tables": [],
+                "apis": [],
+                "files": [],
+                "streams": [],
+            }
+        layer = bundle.get("layer") or self._layer_upper()
+        atlas_schema = self._atlas_schema_name()
+        tbl_rows = []
+        tmap = bundle.get("tables") or {}
+        for tname, rows in tmap.items():
+            tbl_rows.append(
+                {
+                    "schema": atlas_schema,
+                    "table": tname,
+                    "rows": len(rows or []),
+                }
+            )
+        api_rows = []
+        for _lk, ent in (bundle.get("vendor_api_index") or {}).items():
+            if not isinstance(ent, dict):
+                continue
+            api_rows.append(
+                {
+                    "method": ent.get("method", "GET"),
+                    "route_path": ent.get("route_path"),
+                    "system_key": ent.get("system_key"),
+                    "fixture_path": ent.get("fixture_path"),
+                }
+            )
+        file_rows = []
+        for f in bundle.get("files") or []:
+            if not isinstance(f, dict):
+                continue
+            file_rows.append(
+                {
+                    "name": f.get("name"),
+                    "path": f.get("path"),
+                    "system_key": f.get("system_key"),
+                }
+            )
+        stream_rows = []
+        for topic, events in (bundle.get("streams") or {}).items():
+            stream_rows.append(
+                {
+                    "topic": topic,
+                    "event_count": len(events or []),
+                }
+            )
+        return {
+            "layer": layer,
+            "run_id": bundle.get("run_id"),
+            "generated_at": bundle.get("generated_at"),
+            "vendor_code": bundle.get("vendor_code"),
+            "vendor_label": bundle.get("vendor_label"),
+            "tables": tbl_rows,
+            "apis": api_rows,
+            "files": file_rows,
+            "streams": stream_rows,
+        }
 
     async def get_vendor_api_index(self) -> dict[str, Any]:
         return (await self._cache_get_json(self._meta_prefix() + "vendor_api_index")) or {}

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import urllib.parse
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
@@ -36,6 +36,11 @@ def make_backbone_router(attr: str, registry_key: str, tag: str) -> APIRouter:
     class GenerateBody(BaseModel):
         systems: Optional[list[str]] = None
         deliveries: Optional[list[str]] = Field(default=None, description="Table, File, API, Stream")
+        system_deliveries: Optional[Dict[str, list[str]]] = Field(
+            default=None,
+            description="Per product family: modalities to generate (Table, File, API, Stream)",
+        )
+        vendor_code: Optional[str] = Field(default=None, description="Single letter: H,N,E,A,S,O,X")
         refresh_identity: bool = False
         include_legacy_tables: bool = True
 
@@ -48,12 +53,28 @@ def make_backbone_router(attr: str, registry_key: str, tag: str) -> APIRouter:
             clear_telco_pools_cache()
         systems = set(body.systems) if body and body.systems else None
         deliveries = set(body.deliveries) if body and body.deliveries else None
+        sd: dict[str, set[str]] | None = None
+        if body and body.system_deliveries:
+            sd = {}
+            for k, modes in body.system_deliveries.items():
+                if not modes:
+                    continue
+                sd[k] = {str(m).strip() for m in modes if m}
         return await svc.generate_backbone(
             pools=get_telco_pools(),
             systems=systems,
             deliveries=deliveries,
+            system_deliveries=sd,
+            vendor_code=body.vendor_code if body else None,
             include_legacy_tables=body.include_legacy_tables if body else True,
         )
+
+    @router.get("/backbone/summary", tags=[tag])
+    async def backbone_summary(request: Request):
+        svc = _svc(request)
+        if not hasattr(svc, "get_backbone_summary"):
+            raise HTTPException(status_code=501, detail="backbone summary not supported")
+        return await svc.get_backbone_summary()
 
     @router.get("/backbone/artifacts", tags=[tag])
     async def backbone_artifacts(request: Request):

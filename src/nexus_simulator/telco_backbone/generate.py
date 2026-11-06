@@ -6,7 +6,7 @@ import copy
 import json
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 from nexus_simulator.plugins.telco_seed_pools import TelcoPools
 from nexus_simulator.telco_sources.identity import (
@@ -16,6 +16,7 @@ from nexus_simulator.telco_sources.identity import (
     atlas_msisdn,
     trace_customer_internal,
 )
+from nexus_simulator.telco_backbone.atlas_catalog import load_atlas_catalog
 from nexus_simulator.telco_backbone.fixtures import FixtureBundle, load_sample_fixtures
 from nexus_simulator.telco_backbone.vendor_paths import normalize_vendor_route_path, vendor_lookup_key
 
@@ -46,7 +47,7 @@ def _build_c100_mapping(pools: TelcoPools) -> Dict[str, str]:
     return m
 
 
-def _substitute_string(s: str, pools: TelcoPools, ctx: Dict[str, str]) -> str:
+def _substitute_string(s: str, pools: TelcoPools, ctx: Dict[str, Any]) -> str:
     if not s:
         return s
     trace = trace_customer_internal(pools)
@@ -73,6 +74,9 @@ def _substitute_string(s: str, pools: TelcoPools, ctx: Dict[str, str]) -> str:
     # dated filenames 20261105 -> today yyyymmdd
     today = datetime.now(timezone.utc).strftime("%Y%m%d")
     out = re.sub(r"20261105", today, out)
+    if ctx.get("vendor_label"):
+        out = out.replace("{vendor}", str(ctx["vendor_label"]))
+        out = out.replace("{vendor_code}", str(ctx.get("vendor_code") or ""))
     return out
 
 
@@ -86,23 +90,59 @@ def _substitute_obj(obj: Any, pools: TelcoPools, ctx: Dict[str, Any]) -> Any:
     return obj
 
 
+def _allowed_modalities_fixture_atlas(
+    fixture_body: dict[str, Any], atlas_row: dict[str, Any] | None
+) -> Set[str]:
+    fx = set((fixture_body.get("deliveries") or {}).keys())
+    if not atlas_row:
+        return fx
+    at = set(atlas_row.get("deliveries") or [])
+    if not at:
+        return fx
+    return fx & at
+
+
+def _dfilter_for_system(
+    system_key: str,
+    allowed: Set[str],
+    *,
+    deliveries: Optional[Set[str]],
+    system_deliveries: Optional[Dict[str, Set[str]]],
+) -> Set[str]:
+    if system_deliveries and system_key in system_deliveries:
+        return allowed & set(system_deliveries[system_key])
+    if deliveries is not None:
+        return allowed & set(deliveries)
+    return allowed
+
+
 def generate_layer_backbone(
     layer: str,
     pools: TelcoPools,
     *,
     systems: Optional[Set[str]] = None,
     deliveries: Optional[Set[str]] = None,
+    system_deliveries: Optional[Dict[str, Set[str]]] = None,
+    vendor_code: Optional[str] = None,
 ) -> dict[str, Any]:
     """Produce backbone_bundle for one layer (BSS, OSS, or NSS)."""
     bundle: FixtureBundle = load_sample_fixtures()
+    atlas = load_atlas_catalog()
+    atlas_by_layer = atlas.systems_for_layer(layer)
     layer_upper = layer.upper()
     sys_map = bundle.systems_for_layer(layer_upper)
     if systems is not None:
         sys_map = {k: v for k, v in sys_map.items() if k in systems}
-    dfilter = deliveries or {"Table", "File", "API", "Stream"}
+
+    vid = (vendor_code or "").strip().upper()[:1] or None
+    vendor_label = atlas.vendors.get(vid, vendor_code) if vid else None
 
     cid_map = _build_c100_mapping(pools)
-    ctx: Dict[str, Any] = {"cid_map": cid_map}
+    ctx: Dict[str, Any] = {
+        "cid_map": cid_map,
+        "vendor_code": vid,
+        "vendor_label": vendor_label or "",
+    }
 
     tables: Dict[str, List[dict]] = {}
     files: List[dict] = []
@@ -112,6 +152,16 @@ def generate_layer_backbone(
     for system_key, body in sys_map.items():
         dels = body.get("deliveries") or {}
         slug = _sanitize_table_identifier(system_key)[:60]
+        atlas_row = atlas_by_layer.get(system_key)
+        allowed = _allowed_modalities_fixture_atlas(body, atlas_row)
+        dfilter = _dfilter_for_system(
+            system_key,
+            allowed,
+            deliveries=deliveries,
+            system_deliveries=system_deliveries,
+        )
+        if not dfilter:
+            continue
 
         if "Table" in dfilter and dels.get("Table"):
             t = dels["Table"]
@@ -179,6 +229,8 @@ def generate_layer_backbone(
     return {
         "layer": layer_upper,
         "systems": list(sys_map.keys()),
+        "vendor_code": vid,
+        "vendor_label": vendor_label,
         "tables": tables,
         "files": files,
         "vendor_api_index": vendor_api_index,

@@ -6,15 +6,8 @@ import { OracleERPSimulatorPanel } from '@/components/oracle-erp-simulator';
 import { SAPSimulatorPanel } from '@/components/sap-simulator';
 import { ExternalSimulatorPanel } from '@/components/external-simulator';
 import { CPQSimulatorPanel } from '@/components/cpq-simulator/CPQSimulatorPanel';
-import { TelcoSimulatorPanel } from '@/components/telco-simulator';
 import { TelcoBackbonePanel } from '@/components/telco-simulator/TelcoBackbonePanel';
-import {
-  tpmSimulatorService,
-  sourcingSimulatorService,
-  bssSimulatorService,
-  nssSimulatorService,
-  ossSimulatorService,
-} from '@/services/cpqSimulatorService';
+import { tpmSimulatorService, sourcingSimulatorService } from '@/services/cpqSimulatorService';
 import { cn } from '@/lib/utils';
 import {
   SIMULATOR_DOMAINS,
@@ -222,31 +215,28 @@ export default function SimulatorsPage() {
           )}
           {activeTab === 'bss' && (
             <div id="sim-panel-bss" role="tabpanel" aria-labelledby="sim-tab-bss">
-              <TelcoBackbonePanel apiBase="/api/v1/bss-simulator" />
-              <TelcoSimulatorPanel
-                service={bssSimulatorService}
-                title="BSS Simulator"
-                subtitle="Business Support Systems — CRM, billing, care, campaigns, MNP (schema bss_crm)"
+              <TelcoBackbonePanel
+                apiBase="/api/v1/bss-simulator"
+                simulatorTitle="BSS Simulator"
+                simulatorSubtitle="Business Support Systems — CRM, billing, care, campaigns, MNP"
               />
             </div>
           )}
           {activeTab === 'nss' && (
             <div id="sim-panel-nss" role="tabpanel" aria-labelledby="sim-tab-nss">
-              <TelcoBackbonePanel apiBase="/api/v1/nss-simulator" />
-              <TelcoSimulatorPanel
-                service={nssSimulatorService}
-                title="NSS Simulator"
-                subtitle="Network Switching Subsystem — usage aggregates, QoE, attach/VoLTE failures, policy throttle (schema nss_core)"
+              <TelcoBackbonePanel
+                apiBase="/api/v1/nss-simulator"
+                simulatorTitle="NSS Simulator"
+                simulatorSubtitle="Network Switching Subsystem — usage aggregates, QoE, attach and VoLTE failures, policy throttle"
               />
             </div>
           )}
           {activeTab === 'oss' && (
             <div id="sim-panel-oss" role="tabpanel" aria-labelledby="sim-tab-oss">
-              <TelcoBackbonePanel apiBase="/api/v1/oss-simulator" />
-              <TelcoSimulatorPanel
-                service={ossSimulatorService}
-                title="OSS Simulator"
-                subtitle="Operations Support Systems — cell KPIs, alarms, maintenance, trouble tickets (schema oss_network)"
+              <TelcoBackbonePanel
+                apiBase="/api/v1/oss-simulator"
+                simulatorTitle="OSS Simulator"
+                simulatorSubtitle="Operations Support Systems — cell KPIs, alarms, maintenance, trouble tickets"
               />
             </div>
           )}
