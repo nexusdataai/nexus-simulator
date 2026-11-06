@@ -1,0 +1,1 @@
+"""Telco backbone static fixtures."""

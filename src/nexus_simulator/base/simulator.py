@@ -746,3 +746,71 @@ class BaseSimulator(ABC):
             "tables": len(self._tables),
             "total_rows": total_rows,
         }
+
+    async def _finalize_seed_multi(
+        self,
+        server: str,
+        schemas_data: dict[str, dict[str, list[dict]]],
+        *,
+        merge_manifest: bool = True,
+    ) -> dict[str, Any]:
+        """Seed multiple schemas in one pass (e.g. legacy + telco_atlas_*)."""
+        start = time.monotonic()
+        self._servers = [
+            ForeignServerInfo(server_name=server, wrapper_type="simulator", server_options={})
+        ]
+        self._tables = []
+        self._columns = {}
+
+        total_rows = 0
+        manifest_schemas: dict[str, int] = {}
+        primary_schema = ""
+
+        for schema, data_map in schemas_data.items():
+            if not primary_schema:
+                primary_schema = schema
+            table_count = 0
+            for table_name, rows in data_map.items():
+                await self._store_table(schema, table_name, rows)
+                self._tables.append(
+                    ForeignTableInfo(
+                        schema_name=schema,
+                        table_name=table_name,
+                        server_name=server,
+                        column_count=len(rows[0]) if rows else 0,
+                    )
+                )
+                if rows:
+                    self._auto_register_columns(schema, table_name, rows[0])
+                table_count += 1
+                total_rows += len(rows)
+            manifest_schemas[schema] = table_count
+
+        self._loaded = True
+        self._loaded_at = datetime.now(timezone.utc)
+        self._tables_with_data = sum(1 for t in self._tables if t.column_count > 0)
+        self._total_rows = total_rows
+
+        if merge_manifest:
+            self._manifest = {
+                "dump_timestamp": self._loaded_at.isoformat(),
+                "source_url": "seeded",
+                "schema": primary_schema,
+                "schemas": manifest_schemas,
+                "total_tables": len(self._tables),
+                "total_rows_dumped": total_rows,
+            }
+        await self.rebuild_catalog_from_cache()
+        elapsed = time.monotonic() - start
+        msg = (
+            f"{self.SERVICE_NAME} multi-schema seed — {len(self._tables)} tables, "
+            f"{self._total_rows:,} rows across {len(schemas_data)} schema(s) in {elapsed:.1f}s"
+        )
+        self._sim_logger.info(msg)
+        return {
+            "success": True,
+            "message": msg,
+            "tables": len(self._tables),
+            "total_rows": total_rows,
+            "schemas": manifest_schemas,
+        }

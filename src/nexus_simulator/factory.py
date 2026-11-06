@@ -64,6 +64,7 @@ class Simulator:
     nss: Any | None = None
     oss: Any | None = None
     telco_golden: Any | None = None
+    telco_sources: Any | None = None
 
 
 def _build_cache(config: SimulatorConfig) -> CacheBackend:
@@ -222,6 +223,19 @@ def build_simulator(config: SimulatorConfig) -> Simulator:
         )
         sim.telco_golden = golden
         registry.register("telco_golden", golden)
+
+    if config.telco_sources is not None:
+        from .plugins.telco_sources import TelcoSourcesSimulatorService
+
+        ts = TelcoSourcesSimulatorService(
+            bucket=config.telco_sources.bucket, prefix=config.telco_sources.prefix
+        )
+        ts._cache = cache
+        ts._storage = _build_storage(
+            config.telco_sources.bucket, config.telco_sources.prefix, config.region
+        )
+        sim.telco_sources = ts
+        registry.register("telco_sources", ts)
 
     # Out-of-tree plugins registered via register_simulator() are wired last
     # so they cannot accidentally collide with the in-tree set on the same

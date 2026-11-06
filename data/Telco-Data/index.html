@@ -1,0 +1,973 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Telco AI Backbone</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: reference handbook — sticky filter rail on top, section index on the left, wide scrollable tables on the right */
+:root {
+  --bg: #eef2f3; --surface: #ffffff; --fg: #13212a; --muted: #566a76; --line: #d3dce1; --soft: #e4ebee;
+  --accent: #0a6c73; --accent-soft: #d6eeee;
+  --d-table: #2f5fb3; --d-table-bg: #e3ebf9;
+  --d-file: #8a5a0b; --d-file-bg: #f6ead2;
+  --d-api: #1d7a45; --d-api-bg: #dcf1e3;
+  --d-stream: #9b2f5c; --d-stream-bg: #f6dfe8;
+  --bss: #5b3fb0; --oss: #2c6fa8; --nss: #b3591a;
+  --pcore: #4b3fc4; --ink: #1d2a31; --ink-fg: #eef3f5;
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1418; --surface: #151d22; --fg: #e2eaee; --muted: #8fa2ad; --line: #26343c; --soft: #1c262c;
+  --accent: #5cc6c9; --accent-soft: #163538;
+  --d-table: #8fb2f2; --d-table-bg: #1b2a44; --d-file: #e7b765; --d-file-bg: #3a2c12;
+  --d-api: #79d39d; --d-api-bg: #163322; --d-stream: #f08fb6; --d-stream-bg: #3c1a29; --bss: #b7a2f2; --oss: #8cc0ee; --nss: #f0a46a; --pcore: #6352d6; --ink: #0a0f12; --ink-fg: #e2eaee; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e1418; --surface: #151d22; --fg: #e2eaee; --muted: #8fa2ad; --line: #26343c; --soft: #1c262c;
+  --accent: #5cc6c9; --accent-soft: #163538;
+  --d-table: #8fb2f2; --d-table-bg: #1b2a44; --d-file: #e7b765; --d-file-bg: #3a2c12;
+  --d-api: #79d39d; --d-api-bg: #163322; --d-stream: #f08fb6; --d-stream-bg: #3c1a29; --bss: #b7a2f2; --oss: #8cc0ee; --nss: #f0a46a; --pcore: #6352d6; --ink: #0a0f12; --ink-fg: #e2eaee; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 1640px; margin: 0 auto; }
+
+header.top { padding-block: 18px 14px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+header.top h1 { margin: 0; font-size: clamp(24px, 3vw, 30px); }
+header.top .lede { flex: 1 1 360px; }
+.hsrc { margin-left: auto; display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.hsrc .hrow { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.hsrc .hl { font: 500 10.5px var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); min-width: 58px; }
+.hsrc .hv { font: 500 12px var(--font-body); padding: 2px 8px; border-radius: 999px; background: var(--soft); }
+@media (max-width: 900px) { .hsrc { margin-left: 0; } }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-stretch: 82%; font-weight: 800; font-size: clamp(28px, 4vw, 40px); line-height: 1.05; margin: 6px 0 10px; text-wrap: balance; }
+.lede { max-width: 72ch; color: var(--muted); margin: 0; }
+
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-block: 1px solid var(--line); }
+.bar .wrap { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; padding-block: 10px; }
+.grp { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.grp > .lbl { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+#q { font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); width: 240px; max-width: 100%; }
+#q:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.chip { font: 500 12px var(--font-body); border: 1px solid var(--line); background: var(--bg); color: var(--muted); padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+button.chip[aria-pressed="true"] { background: var(--accent-soft); color: var(--fg); border-color: var(--accent); }
+button.chip.d[aria-pressed="true"][data-d="Table"] { background: var(--d-table-bg); border-color: var(--d-table); color: var(--d-table); }
+button.chip.d[aria-pressed="true"][data-d="File"] { background: var(--d-file-bg); border-color: var(--d-file); color: var(--d-file); }
+button.chip.d[aria-pressed="true"][data-d="API"] { background: var(--d-api-bg); border-color: var(--d-api); color: var(--d-api); }
+button.chip.d[aria-pressed="true"][data-d="Stream"] { background: var(--d-stream-bg); border-color: var(--d-stream); color: var(--d-stream); }
+button.reset { font: 500 12px var(--font-body); background: none; border: 0; color: var(--accent); cursor: pointer; text-decoration: underline; padding: 4px; }
+
+.layout { padding-block: 22px 60px; }
+.tabsrow { border-top: 1px solid var(--line); }
+nav.toc { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: thin; }
+nav.toc a { display: inline-flex; align-items: baseline; gap: 8px; padding: 11px 14px 10px; color: var(--muted); text-decoration: none; font-weight: 600; white-space: nowrap; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+nav.toc a:hover { color: var(--fg); background: var(--soft); }
+nav.toc a.on { color: var(--accent); border-bottom-color: var(--accent); }
+nav.toc .n { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--muted); background: var(--soft); padding: 1px 6px; border-radius: 9px; font-variant-numeric: tabular-nums; }
+nav.toc a.on .n { background: var(--accent-soft); color: var(--accent); }
+main { min-width: 0; display: flex; flex-direction: column; gap: 40px; }
+
+section > .shead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 4px; }
+h2 { font-family: var(--font-display); font-stretch: 85%; font-weight: 750; font-size: 24px; margin: 0; }
+h2 .num { color: var(--accent); margin-right: 8px; }
+.count { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sub { color: var(--muted); margin: 0 0 12px; max-width: 80ch; }
+
+.tblwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 1180px; }
+th { position: sticky; top: 0; text-align: left; font-family: var(--font-mono); font-weight: 500; font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); background: var(--soft); padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { vertical-align: top; padding: 11px 12px; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: color-mix(in srgb, var(--soft) 55%, transparent); }
+td.sys { font-weight: 600; width: 170px; }
+td.ven { width: 310px; }
+td.data { width: 210px; }
+td.fmt { width: 230px; color: var(--fg); }
+td.del { width: 110px; }
+td.api { width: 120px; font-family: var(--font-mono); font-size: 12.5px; color: var(--accent); }
+td.sid { width: 190px; }
+
+dl.vend { margin: 0; display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 4px 8px; }
+dl.vend dt { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .03em; color: var(--muted); padding-top: 2px; white-space: nowrap; }
+dl.vend dd { margin: 0; }
+dl.vend dt.dim, dl.vend dd.dim { opacity: .55; }
+.none { color: var(--muted); font-style: italic; }
+
+.dchips { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.dc { font: 600 11px var(--font-mono); padding: 2px 7px; border-radius: 4px; }
+.dc.Table { background: var(--d-table-bg); color: var(--d-table); }
+.dc.File { background: var(--d-file-bg); color: var(--d-file); }
+.dc.API { background: var(--d-api-bg); color: var(--d-api); }
+.dc.Stream { background: var(--d-stream-bg); color: var(--d-stream); }
+.dnote { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+.empty { padding: 18px; color: var(--muted); }
+
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.legend > div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.notes { display: flex; flex-direction: column; gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.notes > div { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.notes > div:last-child { border-bottom: 0; }
+.notes b { font-weight: 600; }
+.notes p { margin: 0; max-width: 90ch; }
+mark { background: var(--accent-soft); color: inherit; border-radius: 2px; padding: 0 1px; }
+
+/* Physical layer */
+.psplit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.pstack { display: flex; flex-direction: column; align-items: stretch; }
+.prow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 13px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--soft); cursor: pointer; }
+.prow .lt { display: flex; flex-direction: column; min-width: 150px; }
+.prow .lt b { font-size: 15px; font-weight: 650; }
+.prow .lt span { font-size: 12.5px; color: var(--muted); }
+.pchips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; flex: 1 1 300px; }
+.pchip { background: var(--ink); color: var(--ink-fg); border-radius: 6px; padding: 10px 8px; font-size: 12.5px; text-align: center; }
+.parrow { text-align: center; color: var(--muted); line-height: 1; padding: 5px 0; font-size: 15px; }
+.prow.t-pcore { background: color-mix(in srgb, var(--pcore) 75%, var(--surface)); border-color: color-mix(in srgb, var(--pcore) 60%, white); }
+.prow.t-pcore .lt b, .prow.t-pcore .lt span { color: #fff; }
+.prow.t-pcore .lt span { opacity: .8; }
+.prow:hover { box-shadow: 0 0 0 1px var(--accent); }
+.prow.sel { box-shadow: 0 0 0 2px var(--accent); }
+.pdetail { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; scroll-margin-top: 140px; }
+.pgrid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; }
+.pgrid h4 { margin: 4px 0 8px; font: 500 10.5px var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.pgrid h4:not(:first-child) { margin-top: 14px; }
+dl.pinside { margin: 0; display: flex; flex-direction: column; gap: 7px; font-size: 13px; }
+dl.pinside dt { font-weight: 600; }
+dl.pinside dd { margin: 0; color: var(--muted); }
+.pdata { display: flex; flex-direction: column; gap: 5px; }
+button.act[data-to-layer] { color: var(--accent); }
+.pdiag { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 8px; }
+.pdiag svg { display: block; width: 100%; min-width: 920px; height: auto; }
+.plegend { margin-top: 10px; }
+.ph-zone { fill: var(--bg); stroke: none; cursor: pointer; }
+.ph-zone.alt { fill: color-mix(in srgb, var(--soft) 60%, var(--surface)); }
+.ph-zone:hover { fill: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.ph-zone.sel { fill: color-mix(in srgb, var(--accent) 13%, var(--surface)); stroke: var(--accent); stroke-width: 1.5; }
+.ph-zone:focus { outline: none; } .ph-zone:focus-visible { stroke: var(--accent); stroke-width: 2.5; }
+.ph-art { pointer-events: none; }
+.ph-h { font: 500 10.5px var(--font-mono); letter-spacing: .08em; fill: var(--muted); }
+.ph-h.on { fill: var(--accent); font-weight: 600; }
+.ph-t { font: 600 12.5px var(--font-body); fill: var(--fg); }
+.ph-s { font: 400 11px var(--font-body); fill: var(--muted); }
+.ph-acc { fill: var(--accent); font-weight: 500; }
+.ph-ossc { fill: var(--oss); }
+.ph-inv { fill: var(--surface); font-weight: 600; }
+.ph-fibre { fill: none; stroke: var(--accent); stroke-width: 2; }
+.ph-mw { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-dasharray: 5 3; }
+.ph-faint { fill: none; stroke: var(--line); stroke-width: 2; stroke-dasharray: 3 4; }
+.ph-ring { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+.ph-mesh { fill: none; stroke: var(--accent); stroke-width: 2; }
+.ph-mgmt { fill: none; stroke: var(--oss); stroke-width: 1.5; stroke-dasharray: 2 5; stroke-linecap: round; }
+.ph-radio { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; }
+.ph-radiol { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; }
+.ph-icon { fill: var(--surface); stroke: var(--fg); stroke-width: 1.6; }
+.ph-iconl { fill: none; stroke: var(--fg); stroke-width: 1.4; }
+.ph-tower { fill: none; stroke: var(--fg); stroke-width: 1.8; stroke-linejoin: round; }
+.ph-ant { fill: var(--muted); }
+.ph-rru { fill: var(--accent); }
+.ph-dish { fill: var(--surface); stroke: var(--fg); stroke-width: 1.6; }
+.ph-cab { fill: var(--fg); }
+.ph-node { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+.ph-nodex { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+.ph-dc { fill: color-mix(in srgb, var(--pcore) 10%, var(--surface)); stroke: var(--pcore); stroke-width: 1.5; }
+.ph-rack { fill: var(--soft); stroke: var(--muted); stroke-width: 1.2; }
+.ph-rackl { stroke: var(--accent); stroke-width: 1.6; }
+.ph-cloud { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; }
+@media (max-width: 1000px) { .psplit { grid-template-columns: minmax(0, 1fr); } .psplit > div:last-child > .parth { display: none; } .pgrid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 520px) { .pchips { grid-template-columns: minmax(0, 1fr); } }
+
+/* Data layer */
+.parth { font-family: var(--font-display); font-stretch: 85%; font-weight: 750; font-size: 19px; margin: 26px 0 10px; }
+#layers > .parth:first-of-type { margin-top: 6px; }
+.topo { display: grid; grid-template-columns: minmax(150px, .8fr) minmax(0, 2.6fr) minmax(190px, 1.1fr); grid-auto-flow: row dense; gap: 12px 14px; align-items: stretch; }
+.topo > .lband, .topo > .ifaces { grid-column: 1 / -1; }
+.colhd { font: 500 10.5px var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 6px 2px 0; }
+.colhd.c1 { grid-column: 1; } .colhd.c2 { grid-column: 2; } .colhd.c3 { grid-column: 3; }
+.lrow { grid-column: 2; }
+.losscell { grid-column: 1; }
+.ldata { grid-column: 3; }
+.lrow, .lband { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 14px; border-radius: 9px; border: 1px solid var(--line); background: var(--soft); position: relative; cursor: pointer; min-width: 0; }
+.lband.t-chan, .lband.t-stage { cursor: default; }
+.lrow .lt, .lband .lt { display: flex; flex-direction: column; min-width: 150px; flex: 0 0 auto; }
+.lt b { font-weight: 650; font-size: 15px; }
+.lt span { font-size: 12.5px; color: var(--muted); }
+.lchips { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 260px; min-width: 0; }
+.lchip { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 7px 11px; font-size: 12.5px; }
+.lvend { flex: 1 1 100%; font: 12px var(--font-mono); color: var(--muted); }
+.t-transport { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.t-transport .lt b { color: var(--accent); }
+.t-nss { background: color-mix(in srgb, var(--nss) 14%, var(--surface)); border-color: color-mix(in srgb, var(--nss) 55%, var(--line)); }
+.t-nss .lt b { color: var(--nss); }
+.t-bss { background: color-mix(in srgb, var(--bss) 12%, var(--surface)); border-color: color-mix(in srgb, var(--bss) 55%, var(--line)); }
+.t-bss .lt b { color: var(--bss); }
+.t-oss { background: color-mix(in srgb, var(--oss) 11%, var(--surface)); border-color: color-mix(in srgb, var(--oss) 55%, var(--line)); }
+.t-oss .lt b { color: var(--oss); }
+.t-stage { background: var(--surface); border: 1.5px dashed var(--accent); }
+.t-chan { background: var(--surface); }
+.lrow:not(:last-of-type)::after { content: ""; }
+.lrow + .losscell + .ldata + .lrow::before { content: "↓"; position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 13px; line-height: 1; color: var(--muted); }
+.lrow:hover, .lband[data-layer]:hover { box-shadow: 0 0 0 1px var(--accent); }
+.lrow.sel, .lband.sel { box-shadow: 0 0 0 2px var(--accent); }
+.nsstag { font: 600 10px var(--font-mono); background: var(--nss); color: var(--surface); padding: 1px 6px; border-radius: 3px; vertical-align: 2px; margin-left: 4px; }
+.losscell { display: flex; flex-direction: column; gap: 3px; justify-content: center; padding: 9px 12px; border-radius: 8px; background: color-mix(in srgb, var(--oss) 9%, var(--surface)); border-left: 3px solid var(--oss); cursor: pointer; }
+.ossname { font-size: 12.5px; font-weight: 500; }
+.mini { font: 500 10.5px var(--font-mono); color: var(--muted); letter-spacing: .03em; }
+.ldata { display: flex; flex-direction: column; gap: 5px; justify-content: center; padding: 9px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); cursor: pointer; }
+.losscell.sel, .ldata.sel { box-shadow: 0 0 0 1px var(--accent); }
+.ditem { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.ditem .dc { min-width: 52px; text-align: center; }
+.ifaces { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 2px 0; }
+.iface { display: inline-flex; gap: 8px; align-items: baseline; font-size: 12.5px; padding: 5px 11px; border-radius: 999px; border: 1px dashed var(--line); background: var(--surface); }
+.iface b { font-weight: 600; color: var(--bss); white-space: nowrap; }
+
+.ldetail { margin-top: 16px; border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; scroll-margin-top: 140px; }
+.ldetail { background: var(--surface); border-top: 4px solid var(--accent); }
+.ldetail.t-nss { border-top-color: var(--nss); } .ldetail.t-bss { border-top-color: var(--bss); } .ldetail.t-oss { border-top-color: var(--oss); } .ldetail.t-neutral { border-top-color: var(--muted); }
+.ldh { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; }
+.ldh h3 { margin: 2px 0 0; font-family: var(--font-display); font-stretch: 85%; font-weight: 750; font-size: 22px; }
+.ldh .lsub { font: 500 13px var(--font-body); color: var(--muted); margin-left: 6px; }
+a.act { text-decoration: none; font: 500 12.5px var(--font-body); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--accent); }
+.ldesc { margin: 0; max-width: 95ch; }
+.ldgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; }
+.ldgrid h4 { margin: 4px 0 8px; font: 500 10.5px var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.ldgrid h4 + * + h4 { margin-top: 16px; }
+.small { font-size: 13px; margin: 0; }
+table.stbl.ltbl { width: 100%; }
+table.stbl.ltbl td { white-space: normal; font-family: var(--font-body); font-size: 12.5px; }
+table.stbl.ltbl td:last-child { white-space: nowrap; }
+.lents { display: flex; flex-wrap: wrap; gap: 6px; }
+button.lent { font: 500 12.5px var(--font-body); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px 5px 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+button.lent .dombadge { margin-left: 0; }
+button.lent:hover { border-color: var(--accent); }
+ul.lai { margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+
+.aistack { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+.stage { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 13px; position: relative; display: flex; flex-direction: column; gap: 4px; scroll-margin-top: 140px; }
+.stage:not(:last-child)::after { content: "→"; position: absolute; right: -14px; top: 26px; color: var(--muted); font-size: 14px; }
+.stage .sh { font: 500 10.5px var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--accent); }
+.stage h4 { margin: 0; font-family: var(--font-display); font-stretch: 88%; font-weight: 700; font-size: 16px; }
+.stage .ssub { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.stage ul { margin: 0; padding-left: 16px; font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
+.stage#stage-ai { border-color: var(--accent); box-shadow: inset 0 3px 0 var(--accent); }
+.srcdoms { display: flex; gap: 4px; margin-bottom: 4px; }
+.srcdoms .dombadge { margin-left: 0; }
+.stage.flash { animation: flash 1.4s ease-out; }
+@keyframes flash { 0%, 40% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+.gov { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 10px 14px; border-radius: 8px; border: 1.5px dashed var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); font-size: 12.5px; }
+.gov b { font-weight: 600; margin-right: 4px; }
+.gov span:not(:last-child)::after { content: "·"; margin-left: 10px; color: var(--muted); }
+.lat { margin-top: 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.lat > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); font-size: 12.5px; }
+.lat b { font-family: var(--font-display); font-stretch: 88%; font-size: 17px; }
+
+ol.trace { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+ol.trace li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; position: relative; padding-bottom: 16px; }
+ol.trace li:not(:last-child)::before { content: ""; position: absolute; left: 16px; top: 32px; bottom: 0; border-left: 2px solid var(--line); }
+.tn { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 600 13px var(--font-mono); background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
+.tb { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 11px 14px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.tb p { margin: 0; max-width: 100ch; font-size: 13.5px; }
+.tmeta { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.ttime { font-family: var(--font-mono); }
+.ttitle { font-size: 15px; font-weight: 650; }
+.tai { color: var(--fg); background: var(--bg); border-radius: 6px; padding: 6px 10px; }
+.tai span { font: 600 11px var(--font-mono); color: var(--accent); text-transform: uppercase; letter-spacing: .05em; }
+button.where { font: 600 12px var(--font-body); padding: 3px 9px; border-radius: 5px; border: 1px solid var(--line); background: var(--soft); color: var(--fg); cursor: pointer; }
+button.where.ai { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
+button.where:hover { border-color: var(--accent); }
+
+@media (max-width: 1250px) { .aistack { grid-template-columns: repeat(3, minmax(0, 1fr)); } .stage:nth-child(3n)::after { display: none; } }
+@media (max-width: 900px) {
+  .topo { grid-template-columns: minmax(0, 1fr); }
+  .lrow, .losscell, .ldata, .colhd.c1, .colhd.c2, .colhd.c3 { grid-column: auto; }
+  .colhd.c1, .colhd.c3 { display: none; }
+  .losscell, .ldata { margin-top: -6px; }
+  .lrow + .losscell + .ldata + .lrow::before { display: none; }
+  .ldgrid { grid-template-columns: minmax(0, 1fr); }
+  .lat { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) { .aistack { grid-template-columns: minmax(0, 1fr); } .stage::after { display: none; } }
+
+/* Entity model */
+.ecols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.ecol { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-width: 0; }
+.ecol > header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 11px 14px; background: var(--soft); border-bottom: 1px solid var(--line); }
+.ecol h3 { margin: 0; font-family: var(--font-display); font-stretch: 85%; font-weight: 750; font-size: 18px; }
+.ecol .elist { display: flex; flex-direction: column; }
+button.ent { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; text-align: left; font: 500 13.5px var(--font-body); color: var(--fg); background: none; border: 0; border-bottom: 1px solid var(--line); border-left: 3px solid transparent; padding: 9px 12px 9px 11px; cursor: pointer; }
+.elist button.ent:last-child { border-bottom: 0; }
+button.ent:hover { background: var(--soft); }
+button.ent[aria-pressed="true"] { background: var(--accent-soft); border-left-color: var(--accent); }
+button.ent .eapi { font: 500 11px var(--font-mono); color: var(--accent); white-space: nowrap; }
+button.ent .ef { font: 400 11px var(--font-mono); color: var(--muted); }
+.modal { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, #0b1216 55%, transparent);
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.edetail > * { flex-shrink: 0; }
+.edetail { width: 100%; max-width: min(1400px, 96vw); max-height: 100%; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 20px 50px rgba(0,0,0,.28); }
+.ehead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+button.xclose { font: 500 20px/1 var(--font-body); width: 34px; height: 34px; flex: none; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
+body.modal-open { overflow: hidden; }
+.modal[hidden] { display: none; }
+.ecol[data-dom="BSS"] > header { border-top: 3px solid var(--bss); }
+.ecol[data-dom="OSS"] > header { border-top: 3px solid var(--oss); }
+.ecol[data-dom="NSS"] > header { border-top: 3px solid var(--nss); }
+.edetail h4 { margin: 8px 0 0; font-family: var(--font-display); font-stretch: 88%; font-weight: 700; font-size: 16px; }
+.rdiag { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.rdiag svg { display: block; width: 100%; min-width: 820px; max-height: none; height: auto; }
+.rdiag { padding: 6px; }
+.edetail .tblwrap { overflow: auto; }
+.rdiag .rnode { cursor: pointer; }
+.rdiag .rnode:hover rect.box, .rdiag .rnode:focus-visible rect.box { stroke-width: 2.5; }
+.rdiag .rnode:focus { outline: none; }
+.rlegend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); align-items: center; }
+.rlegend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.rlegend .ln { display: inline-block; width: 22px; border-top: 2px solid var(--muted); margin-right: 5px; vertical-align: 3px; }
+.rlegend .ln.dash { border-top-style: dashed; }
+button.rlink { font: 500 12.5px var(--font-body); color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; text-align: left; }
+.rdir { font: 600 11px var(--font-mono); white-space: nowrap; }
+.rkind { font: 500 11px var(--font-mono); padding: 1px 6px; border-radius: 4px; background: var(--soft); white-space: nowrap; }
+.rkind.join { background: var(--d-file-bg); color: var(--d-file); }
+.dombadge { font: 600 10px var(--font-mono); padding: 1px 5px; border-radius: 3px; margin-left: 6px; color: var(--surface); }
+.dombadge.BSS { background: var(--bss); } .dombadge.OSS { background: var(--oss); } .dombadge.NSS { background: var(--nss); }
+button.back { font: 500 12.5px var(--font-body); color: var(--accent); background: none; border: 0; padding: 0 0 2px; cursor: pointer; align-self: flex-start; }
+.edetail h3 { margin: 0; font-family: var(--font-display); font-stretch: 85%; font-weight: 750; font-size: 22px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.edetail h3 .eapi { font: 600 12px var(--font-mono); color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 4px; }
+.edetail h3 .edom { font: 500 11px var(--font-mono); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.emeta { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 4px 12px; font-size: 13px; }
+.emeta dt { color: var(--muted); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding-top: 2px; }
+.emeta dd { margin: 0; }
+table.ftbl { min-width: 760px; }
+table.ftbl td { padding: 8px 12px; font-size: 13px; }
+table.ftbl td.fn { font-family: var(--font-mono); font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+table.ftbl td.ft { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+table.ftbl td.fx { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+table.ftbl tr.common td { opacity: .7; }
+@media (max-width: 680px) { .ecols { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1100px) { button.ent { flex-direction: column; gap: 2px; } }
+
+/* Samples */
+button.sbtn { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font: 500 12px var(--font-body); color: var(--accent); background: var(--accent-soft); border: 1px solid transparent; border-radius: 5px; padding: 3px 9px; cursor: pointer; }
+button.sbtn[aria-expanded="true"] { border-color: var(--accent); }
+button.sbtn .car { font-family: var(--font-mono); transition: transform .15s; }
+button.sbtn[aria-expanded="true"] .car { transform: rotate(90deg); }
+tr.detail > td { background: var(--bg); padding: 0; }
+tbody tr.detail:hover td { background: var(--bg); }
+.spanel { padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 12px; position: sticky; left: 0; max-width: min(1100px, calc(100vw - 48px)); }
+.stabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.stab { font: 600 12px var(--font-mono); padding: 5px 11px; border-radius: 5px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
+.stab[aria-selected="true"].Table { background: var(--d-table-bg); color: var(--d-table); border-color: var(--d-table); }
+.stab[aria-selected="true"].File { background: var(--d-file-bg); color: var(--d-file); border-color: var(--d-file); }
+.stab[aria-selected="true"].API { background: var(--d-api-bg); color: var(--d-api); border-color: var(--d-api); }
+.stab[aria-selected="true"].Stream { background: var(--d-stream-bg); color: var(--d-stream); border-color: var(--d-stream); }
+.shint { font-size: 12.5px; color: var(--muted); }
+.shint code, .fname, .apireq code { font-family: var(--font-mono); }
+.shint code { color: var(--fg); font-size: 12px; }
+table.stbl { min-width: 0; width: auto; font-variant-numeric: tabular-nums; }
+table.stbl th { position: static; }
+table.stbl td { font-family: var(--font-mono); font-size: 12px; padding: 7px 12px; white-space: nowrap; }
+table.stbl.kv td:first-child { color: var(--muted); }
+table.stbl.kv td:last-child { white-space: normal; word-break: break-word; }
+.filecard { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.filecard > div:first-child { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.fname { font-size: 12.5px; font-weight: 500; word-break: break-all; }
+.factions { display: flex; gap: 8px; }
+button.act { font: 500 12.5px var(--font-body); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+button.act.primary { background: var(--d-file); border-color: var(--d-file); color: var(--surface); }
+body.nodl .dlbtn { display: none; }
+pre.preview { margin: 0; max-height: 340px; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; font: 12px/1.55 var(--font-mono); white-space: pre; }
+.fstatus { font-size: 12.5px; color: var(--muted); min-height: 1em; }
+.apireq { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; }
+.apireq .m { font: 600 11.5px var(--font-mono); background: var(--d-api-bg); color: var(--d-api); padding: 2px 7px; border-radius: 4px; }
+.apireq code { font-size: 12.5px; word-break: break-all; min-width: 0; }
+.status200 { font: 600 11.5px var(--font-mono); color: var(--d-api); }
+.streamhead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.streamhead .topic { font: 600 12.5px var(--font-mono); color: var(--d-stream); }
+ol.stream { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+ol.stream li { display: grid; grid-template-columns: 52px 210px 170px minmax(0, 1fr); gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); font: 12px/1.5 var(--font-mono); border-left: 3px solid var(--d-stream); }
+ol.stream li:last-child { border-bottom: 0; }
+ol.stream .off { color: var(--muted); font-variant-numeric: tabular-nums; }
+ol.stream .ts { color: var(--muted); }
+ol.stream .key { color: var(--d-stream); word-break: break-all; }
+ol.stream code { word-break: break-word; }
+@media (prefers-reduced-motion: no-preference) { ol.stream li.in { animation: slidein .35s ease-out; } }
+@keyframes slidein { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 900px) {
+  ol.stream li { grid-template-columns: 1fr; gap: 2px; }
+  nav.toc a { padding-inline: 10px; }
+  .notes > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  #q { width: 100%; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<header class="top wrap">
+  <h1>Telco AI Backbone</h1>
+  <p class="lede">From cell site to customer insight: the network, the BSS, OSS and NSS systems that run it, the data they produce in TMF form, and how AI turns that data into action.</p>
+  <div class="hsrc" aria-label="Data sources and formats">
+    <div class="hrow"><span class="hl">Data from</span><span class="hv">Huawei</span><span class="hv">Nokia</span><span class="hv">Ericsson</span><span class="hv">Amdocs</span><span class="hv">Salesforce</span><span class="hv">Oracle</span></div>
+    <div class="hrow"><span class="hl">Arrives as</span><span class="dc Table">Table</span><span class="dc File">File</span><span class="dc API">API</span><span class="dc Stream">Stream</span></div>
+  </div>
+</header>
+
+<div class="bar">
+  <div class="wrap">
+    <div class="grp"><label class="lbl" for="q">Search</label><input id="q" type="search" placeholder="e.g. CDR, TMF635, Siebel"></div>
+    <div class="grp" id="vendors"><span class="lbl">Vendors</span></div>
+    <div class="grp" id="deliv"><span class="lbl">Delivery</span></div>
+    <button class="reset" id="reset" type="button">Clear filters</button>
+    <button class="reset" id="expand" type="button">Open all samples</button>
+  </div>
+  <div class="tabsrow"><div class="wrap" style="padding-block:0"><nav class="toc" id="toc" aria-label="Sections"></nav></div></div>
+</div>
+
+<div class="wrap layout">
+  <main id="main"></main>
+</div>
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="etitle"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="samples.js"></script>
+<script src="tmf-entities.js"></script>
+<script src="layers.js"></script>
+<script src="physical.js"></script>
+<script>
+const VENDORS = [
+  ["H","Huawei"],["N","Nokia"],["E","Ericsson"],["A","Amdocs"],["S","Salesforce"],["O","Oracle"],["X","Others"]
+];
+const DELIV = ["Table","File","API","Stream"];
+
+const BSS = [
+ {sys:"CRM / customer master", v:{H:"BES CRM (Digital BSS)",E:"Order Care",A:"Amdocs CRM (Commerce & Care Suite)",S:"Communications Cloud on Sales / Service Cloud",O:"Siebel CRM, Oracle CX Sales"},
+  data:"Customer, account, contacts, segment, tenure, KYC, household / business hierarchy",
+  fmt:"RDBMS tables (Oracle DB behind BES, Amdocs, Siebel); Salesforce objects (Account, Contact, Asset); JSON",
+  del:["Table","API","File"], dn:"Salesforce: REST / Bulk API 2.0 (CSV) and Change Data Capture events",
+  api:"TMF629 · TMF632 · TMF666", sid:"Customer, Party (Individual / Organization), BillingAccount"},
+ {sys:"Product catalog", v:{H:"BES Product Catalog",E:"Catalog Manager",A:"Amdocs Catalog",S:"Enterprise Product Catalog (EPC)",O:"Launch Cloud, Siebel Product Configurator",X:"Netcracker"},
+  data:"Plans, offers, bundles, prices, eligibility rules",
+  fmt:"Tables; XML / JSON catalog exports",
+  del:["Table","API","File"], api:"TMF620", sid:"ProductOffering, ProductSpecification, ProductOfferingPrice"},
+ {sys:"Order management", v:{H:"BES Order",N:"FlowOne (fulfilment)",E:"Order Care",A:"Amdocs Order Handling",S:"Industries Order Management",O:"Order and Service Management (OSM)"},
+  data:"Plan changes, add-ons, SIM swaps, new connections, order status",
+  fmt:"Tables; JSON; order lifecycle events",
+  del:["Table","API","Stream"], api:"TMF622 · TMF641", sid:"ProductOrder, ServiceOrder"},
+ {sys:"Subscriptions / installed base", v:{H:"BES",E:"Order Care",A:"Amdocs product inventory",S:"Asset records (Communications Cloud)",O:"Siebel Asset, BRM purchased products"},
+  data:"Active products per subscriber, contract end date, device instalments left",
+  fmt:"Tables",
+  del:["Table","API"], api:"TMF637 · TMF651", sid:"Product, Agreement"},
+ {sys:"Online charging (OCS / CCS / CHF)", v:{H:"CBS",N:"Converged Charging",E:"Ericsson Charging",A:"Amdocs Charging (Monetization Suite)",O:"Elastic Charging Engine (ECE), Network Charging and Control (NCC)"},
+  data:"Prepaid balance, recharges, rated events, fair-usage counters",
+  fmt:"ASN.1 or CSV EDR files; Diameter Gy / Ro; 5G Nchf (HTTP/2)",
+  del:["File","Stream","API"], api:"TMF635 · TMF654 · TMF670", sid:"Usage, PrepayBalance, PaymentMethod"},
+ {sys:"Mediation", v:{H:"CBS mediation",N:"EventLink",E:"Multi Mediation",A:"Amdocs Mediation",O:"Offline Mediation Controller"},
+  data:"Collected and normalised CDRs from network nodes",
+  fmt:"ASN.1 in; CSV / Parquet out",
+  del:["File","Stream"], dn:"Output often published to Kafka",
+  api:"TMF635", sid:"Usage"},
+ {sys:"Billing / invoicing", v:{H:"CBS",E:"Ericsson Billing (BSCS iX)",A:"Amdocs Billing (Monetization Suite)",S:"Revenue Cloud / Salesforce Billing (non-usage)",O:"Billing and Revenue Management (BRM)"},
+  data:"Invoices, bill amount, adjustments, disputes, credits",
+  fmt:"Tables; PDF / XML bill files",
+  del:["Table","File"], api:"TMF678", sid:"CustomerBill, AppliedCustomerBillingRate"},
+ {sys:"Payments and collections", v:{H:"CBS A/R",E:"BSCS iX A/R",A:"Amdocs A/R & Collections",S:"Salesforce Billing payments",O:"BRM A/R, Collections Manager",X:"Payment gateways"},
+  data:"Payments, failed payments, dunning stage",
+  fmt:"Tables",
+  del:["Table","API"], api:"TMF676 · TMF666", sid:"Payment, BillingAccount (credit / dunning)"},
+ {sys:"Customer care / complaints", v:{H:"BES care",A:"Amdocs care (Commerce & Care Suite)",S:"Service Cloud (Cases)",O:"Siebel Service, Oracle B2C Service",X:"Remedy, ServiceNow"},
+  data:"Contacts, complaints, repeat calls, resolution",
+  fmt:"Tables; JSON",
+  del:["Table","API"], dn:"REST / SOAP",
+  api:"TMF621 · TMF683", sid:"TroubleTicket, PartyInteraction"},
+ {sys:"Campaign / offers", v:{H:"SmartCare campaign",A:"Amdocs customer engagement / real-time offers",S:"Marketing Cloud",O:"Eloqua, Responsys",X:"Pega, SAS, Adobe"},
+  data:"Offers sent, accepted, ignored; contact fatigue",
+  fmt:"Tables; CSV",
+  del:["Table","File"], api:"TMF680 · TMF671", sid:"Recommendation, Promotion"},
+ {sys:"Customer data platform / event hub", v:{A:"Amdocs Data Hub",S:"Data Cloud",O:"Unity CDP",X:"Kafka / Confluent, Snowflake"},
+  data:"Unified customer profile, real-time behavioural events",
+  fmt:"Kafka events (JSON / Avro); Parquet; tables",
+  del:["Stream","Table","File"], api:"TMF688 · TMF629", sid:"Event, Customer"},
+ {sys:"MNP / port-out", v:{X:"National clearinghouse + operator MNP gateway"},
+  data:"Port-out requests, porting codes",
+  fmt:"CSV; SOAP / REST",
+  del:["File","API"], api:"TMF683 or TMF622", sid:"PartyInteraction or ProductOrder (port-out)"},
+ {sys:"Digital (app / web)", v:{S:"Experience Cloud",X:"Adobe Analytics, Google Analytics, in-house app"},
+  data:"Sessions, cancellation-page visits, plan comparisons",
+  fmt:"JSON events",
+  del:["Stream","File"], api:"TMF683", sid:"PartyInteraction"},
+];
+
+const OSS = [
+ {sys:"Element manager: Fault (FM)", v:{H:"iMaster MAE",N:"MantaRay NM",E:"Ericsson Network Manager (ENM)",O:"Unified Assurance (manager of managers)",X:"IBM Netcool"},
+  data:"Alarms: raise / clear, severity, cell / site, timestamps",
+  fmt:"3GPP Itf-N alarms; SNMP traps; CORBA; Kafka / REST on newer releases",
+  del:["Stream","API"], dn:"Stream is the main path; API for alarm resync",
+  api:"TMF642", sid:"Alarm → Resource"},
+ {sys:"Element manager: Performance (PM)", v:{H:"iMaster MAE",N:"MantaRay NM",E:"Ericsson Network Manager (ENM)",O:"Unified Assurance (metrics)",X:"TEOCO Helix, InfoVista"},
+  data:"Counters per cell per 15 min: drops, PRB, throughput, accessibility",
+  fmt:"3GPP XML (TS 32.435); vendor CSV; gzip / tar per reporting period",
+  del:["File"], dn:"Pulled over SFTP",
+  api:"TMF628 · TMF649", sid:"PerformanceMeasurement, Threshold"},
+ {sys:"Element manager: Configuration (CM)", v:{H:"MAE CM export",N:"MantaRay NM (RAML export)",E:"ENM Bulk CM / cmedit"},
+  data:"Cell parameters, tilt, neighbours, site status",
+  fmt:"Bulk CM XML (3GPP TS 32.616); Nokia RAML XML; CSV dumps",
+  del:["File","API"], dn:"API via CLI / REST",
+  api:"TMF639 · TMF634", sid:"Resource, ResourceSpecification"},
+ {sys:"PM / statistics warehouse", v:{H:"PRS",N:"MantaRay NM reporting / PM DB",E:"ENIQ Statistics, Business Objects"},
+  data:"Aggregated KPIs (hourly / daily)",
+  fmt:"Oracle / Sybase IQ tables; report CSV",
+  del:["Table","File"], api:"TMF628", sid:"PerformanceMeasurement"},
+ {sys:"Transport / IP NMS", v:{H:"iMaster NCE",N:"Network Services Platform (NSP)",E:"ENM (MINI-LINK, Router 6000)",X:"Ciena, Cisco"},
+  data:"Link alarms, utilisation, fibre and microwave faults",
+  fmt:"SNMP; NETCONF / RESTCONF; gRPC telemetry; CSV PM",
+  del:["Stream","API","File"], api:"TMF642 · TMF628 · TMF639", sid:"Alarm, PerformanceMeasurement, Resource (Link, Port)"},
+ {sys:"Autonomous ops / analytics", v:{H:"MAOS / SmartCare",N:"MantaRay SON, AVA",E:"Intelligent Automation Platform"},
+  data:"Correlated KPIs, root cause, SON actions",
+  fmt:"REST / JSON; Kafka",
+  del:["API","Stream"], api:"TMF656 · TMF628", sid:"ServiceProblem, PerformanceMeasurement"},
+ {sys:"Probes / CEM / QoE", v:{H:"SEQ Analyst",N:"Customer experience analytics",E:"Expert Analytics",X:"NetScout"},
+  data:"Per-subscriber xDRs, throughput, latency, video stalls, app mix",
+  fmt:"Parquet / CSV xDR files; Kafka; Hadoop / ClickHouse tables",
+  del:["Stream","File","Table"], api:"TMF657 · TMF635", sid:"ServiceLevelObjective / quality, Usage (session xDR)"},
+ {sys:"Service orchestration & activation", v:{N:"FlowOne, Orchestration Center",E:"Dynamic Orchestration, Dynamic Activation",A:"Amdocs Service & Network Automation",O:"OSM (technical orders), ASAP activation"},
+  data:"Service orders, activation status, provisioning results",
+  fmt:"JSON; tables; SOAP",
+  del:["API","Table","Stream"], api:"TMF641 · TMF640 · TMF638", sid:"ServiceOrder, Service"},
+ {sys:"Trouble tickets (network)", v:{N:"Service assurance tools",E:"Service assurance tools",S:"Service Cloud, Field Service",O:"Unified Assurance",X:"Remedy, ServiceNow, AUTIN"},
+  data:"Incidents, time to resolve, affected cells",
+  fmt:"Tables; REST",
+  del:["Table","API"], dn:"API also used to write back worklogs",
+  api:"TMF621 · TMF656", sid:"TroubleTicket, ServiceProblem"},
+ {sys:"Change / planned work", v:{S:"Field Service (work orders)",X:"Remedy Change, ServiceNow, SI Workflow"},
+  data:"Change requests, maintenance windows",
+  fmt:"Tables; REST",
+  del:["Table","API"], api:"TMF655 · TMF697", sid:"ChangeRequest, WorkOrder"},
+ {sys:"Planning / cell inventory", v:{H:"MAE / NCE inventory",E:"Adaptive Inventory",A:"Amdocs Network / Resource Inventory",O:"Unified Inventory Management (UIM)",X:"Netcracker, Atoll, Planet, Asset"},
+  data:"Sites, cells, coordinates, technology, azimuth",
+  fmt:"Excel / CSV; DB tables; KML",
+  del:["File","Table","API"], api:"TMF639 · TMF674 · TMF673", sid:"Resource, GeographicSite, GeographicAddress"},
+];
+
+const NSS = [
+ {sys:"HLR / HSS / UDM / UDR", v:{H:"UDM / HSS",N:"Cloud SDM (One-NDS)",E:"UDM / HSS + CUDB, Dynamic Activation",O:"Cloud Native Core UDR"},
+  data:"Subscriber network profile, barring, roaming, APNs",
+  fmt:"LDAP; MML; SOAP / REST provisioning; DB dumps",
+  del:["API","File"], api:"TMF638 · TMF640", sid:"Service, ServiceActivation"},
+ {sys:"MSC / MSS (2G / 3G voice)", v:{H:"MSOFTX",N:"Open MSS",E:"MSC-S"},
+  data:"Voice CDRs",
+  fmt:"ASN.1 BER CDR files (3GPP TS 32.298)",
+  del:["File"], dn:"Usually collected via mediation",
+  api:"TMF635", sid:"Usage"},
+ {sys:"Packet gateway (SGW / PGW / SMF / UPF)", v:{H:"UNC / UDG",N:"Cloud Packet Core (CMG)",E:"PCG / PCC"},
+  data:"Data session CDRs: volume, APN, RAT, cell",
+  fmt:"ASN.1 CDR files; Nchf to CHF",
+  del:["File","Stream"], api:"TMF635", sid:"Usage"},
+ {sys:"MME / AMF (mobility)", v:{H:"UNC",N:"Cloud Mobility Manager",E:"PCC"},
+  data:"Attach / registration failures, last cell / TAI",
+  fmt:"Event streams (Ericsson EBM, Huawei CHR / trace); PM XML",
+  del:["Stream","File"], api:"TMF635 · TMF639", sid:"Usage (event), Resource (cell link)"},
+ {sys:"PCRF / PCF (policy)", v:{H:"UPCF",N:"Cloud Mobile Policy",E:"SAPC / Dual-mode Policy",O:"Policy Management (PCRF), Cloud Native Core PCF"},
+  data:"Fair-usage limit hit, throttling, QoS changes",
+  fmt:"Event logs / CSV; Diameter Gx / N7; Kafka",
+  del:["File","Stream"], api:"TMF635 · TMF638", sid:"Usage (policy event), Service state"},
+ {sys:"IMS / VoLTE / VoWiFi", v:{H:"CloudCore IMS",N:"Cloud Session Core",E:"vCSCF / MTAS",O:"Session Border Controller (SBC)"},
+  data:"VoLTE CDRs, SIP setup failures, drops",
+  fmt:"ASN.1 CDR files (Rf / CCF); SIP failure logs",
+  del:["File","Stream"], api:"TMF635 · TMF656", sid:"Usage, ServiceProblem"},
+ {sys:"Signalling routing (DRA / SCP / SEPP)", v:{N:"Cloud Signaling Director",E:"Signaling Controller",O:"Diameter Signaling Router, Cloud Native Core SCP / SEPP",X:"F5"},
+  data:"Diameter / HTTP/2 signalling records, roaming signalling, routing failures",
+  fmt:"Log / xDR files; Kafka",
+  del:["Stream","File"], api:"TMF635 · TMF642", sid:"Usage (signalling event), Alarm"},
+ {sys:"SMSC / USSD", v:{H:"USSD GW",X:"Mavenir, Comviva"},
+  data:"SMS and USSD records, balance checks",
+  fmt:"CSV logs",
+  del:["File"], api:"TMF635", sid:"Usage"},
+ {sys:"EIR", v:{H:"EIR",N:"EIR",E:"EIR",X:"Third-party EIR"},
+  data:"IMEI, device model, device change",
+  fmt:"DB tables; CSV",
+  del:["Table","File"], api:"TMF639 · TMF637", sid:"Resource (device), Product (handset)"},
+ {sys:"NWDAF (5G analytics)", v:{H:"NWDAF",N:"NWDAF",E:"NWDAF",O:"Cloud Native Core NWDAF"},
+  data:"Load, mobility, QoS analytics",
+  fmt:"REST (Nnwdaf); Kafka",
+  del:["API","Stream"], api:"TMF628 · TMF657", sid:"PerformanceMeasurement, ServiceLevelObjective"},
+ {sys:"Roaming (TAP / RAP)", v:{X:"Syniverse, BICS (via BSS)"},
+  data:"Roaming usage",
+  fmt:"TAP3 ASN.1 files",
+  del:["File"], api:"TMF635", sid:"Usage"},
+];
+
+const TMF = [
+ ["Customer, account, profile","TMF629 · TMF632 · TMF666","Customer, Individual / Organization, BillingAccount","CRM (BES, Amdocs, Salesforce, Siebel)"],
+ ["Plans, subscriptions, contracts","TMF620 · TMF637 · TMF651","ProductOffering, Product, Agreement","Catalog, order, installed base"],
+ ["Orders (product and service)","TMF622 · TMF641","ProductOrder, ServiceOrder","Order management, OSM, FlowOne"],
+ ["Usage (voice, data, SMS, policy events)","TMF635","Usage, UsageSpecification","Mediation, OCS, MSC, PGW, IMS, PCF"],
+ ["Bills, payments, recharges","TMF678 · TMF676 · TMF654","CustomerBill, Payment, PrepayBalance","CBS, BSCS iX, Amdocs Billing, BRM"],
+ ["Complaints, care, digital touches","TMF621 · TMF683","TroubleTicket, PartyInteraction","Care, Service Cloud, Remedy, app / web"],
+ ["Real-time customer events","TMF688","Event","Data Hub, Data Cloud, Kafka"],
+ ["Alarms","TMF642","Alarm","iMaster MAE, MantaRay NM, ENM, iMaster NCE, Unified Assurance"],
+ ["KPIs and QoE","TMF628 · TMF657","PerformanceMeasurement, ServiceLevelObjective","PM files, ENIQ / PRS, probes, NWDAF"],
+ ["Cells, sites, devices","TMF639 · TMF674","Resource (Logical / Physical), GeographicSite","CM exports, inventory (UIM, Amdocs), EIR"],
+ ["Network services per subscriber","TMF638 · TMF640","Service (CFS / RFS)","HSS / UDM, activation, PCF"],
+ ["Changes and maintenance","TMF655 · TMF697","ChangeRequest, WorkOrder","Remedy Change, ServiceNow, Field Service"],
+ ["Offers and recommendations","TMF680 · TMF671","Recommendation, Promotion","Campaign tools, Marketing Cloud, Eloqua"],
+];
+
+const MODES = [
+ ["Table","Direct database read over JDBC / ODBC, or a database view or replica."],
+ ["File","Scheduled export (XML, CSV, ASN.1 binary), usually gzip, zip or tar, pulled over SFTP."],
+ ["API","Request / response interface: REST, SOAP, CORBA, MML / CLI, LDAP."],
+ ["Stream","Pushed continuously: SNMP traps, Kafka, CORBA notifications, event streams."],
+];
+
+const NOTES = [
+ ["Mapping to the staging design","Scheduled file exports carry PM XML, CDRs, CM and topology, the high-volume batch feeds. The REST / DB read path covers Remedy, AUTIN, SI Workflow and the BSS tables. The alarm NBI feed (SNMP / CORBA / Kafka) is usually the only real-time OSS stream."],
+ ["Amdocs, Salesforce and Oracle","These mostly sit on the BSS side and in OSS inventory and orchestration. Amdocs and Siebel / BRM keep their data in Oracle DB tables, so a read replica is often the simplest feed. Salesforce data is reached only through its APIs (REST, Bulk API 2.0 CSV, Change Data Capture). All three expose TMF Open API endpoints on recent releases, so check whether a TMF-native API already exists before building a mapping."],
+ ["ASN.1 CDRs","They need decoding. Take them after mediation (CSV / Parquet) where possible, rather than raw from MSC, PGW or IMS."],
+ ["PM file volume","PM arrives as one file per node per 15-minute period, often gzip or tar. Aggregate per cell per day in staging before joining to subscribers."],
+ ["OSS has no subscriber key","Every OSS row joins to a subscriber through cell ID (from MME / AMF or probe location) plus a time window. In TMF terms this is the link between Resource and Service / Product."],
+];
+
+const SECTIONS = [
+ {id:"bss", n:"1", title:"BSS", sub:"Customer, commercial and money.", rows:BSS},
+ {id:"oss", n:"2", title:"OSS", sub:"Network management and assurance.", rows:OSS},
+ {id:"nss", n:"3", title:"NSS / core network", sub:"Subscriber, session and usage.", rows:NSS},
+];
+
+const state = { q:"", vendors:new Set(VENDORS.map(v=>v[0])), deliv:new Set() };
+try { const s = JSON.parse(localStorage.getItem("atlas-filters")||"null");
+  if (s) { state.vendors = new Set(s.vendors); state.deliv = new Set(s.deliv); } } catch(e) {}
+function save(){ try { localStorage.setItem("atlas-filters", JSON.stringify({vendors:[...state.vendors], deliv:[...state.deliv]})); } catch(e) {} }
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function hi(s){ const t = esc(s); if(!state.q) return t;
+  const q = state.q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); return t.replace(new RegExp("("+q+")","ig"),"<mark>$1</mark>"); }
+
+function rowText(r){ return [r.sys, ...Object.values(r.v), r.data, r.fmt, r.del.join(" "), r.dn||"", r.api, r.sid].join(" ").toLowerCase(); }
+function rowVisible(r){
+  const allV = state.vendors.size === VENDORS.length;
+  if (!allV && !Object.keys(r.v).some(k => state.vendors.has(k))) return false;
+  if (state.deliv.size && !r.del.some(d => state.deliv.has(d))) return false;
+  if (state.q && !rowText(r).includes(state.q.toLowerCase())) return false;
+  return true;
+}
+
+function renderControls(){
+  const vg = document.getElementById("vendors");
+  vg.querySelectorAll("button").forEach(b=>b.remove());
+  VENDORS.forEach(([k,name])=>{
+    const b = document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=name;
+    b.setAttribute("aria-pressed", state.vendors.has(k));
+    b.onclick = ()=>{ state.vendors.has(k) ? state.vendors.delete(k) : state.vendors.add(k);
+      if (!state.vendors.size) VENDORS.forEach(v=>state.vendors.add(v[0])); save(); renderControls(); render(); };
+    vg.appendChild(b);
+  });
+  const dg = document.getElementById("deliv");
+  dg.querySelectorAll("button").forEach(b=>b.remove());
+  DELIV.forEach(d=>{
+    const b = document.createElement("button"); b.type="button"; b.className="chip d"; b.dataset.d=d; b.textContent=d;
+    b.setAttribute("aria-pressed", state.deliv.has(d));
+    b.onclick = ()=>{ state.deliv.has(d) ? state.deliv.delete(d) : state.deliv.add(d); save(); renderControls(); render(); };
+    dg.appendChild(b);
+  });
+}
+
+function vendorCell(r){
+  const items = VENDORS.filter(([k])=>r.v[k]).map(([k,name])=>{
+    const dim = state.vendors.size !== VENDORS.length && !state.vendors.has(k) ? ' class="dim"' : '';
+    return `<dt${dim}>${name}</dt><dd${dim}>${hi(r.v[k])}</dd>`; });
+  return items.length ? `<dl class="vend">${items.join("")}</dl>` : `<span class="none">No major product</span>`;
+}
+
+function render(){
+  const main = document.getElementById("main"); let html = ""; const counts = {};
+  SECTIONS.forEach(s=>{
+    const rows = s.rows.filter(rowVisible); counts[s.id] = rows.length;
+    html += `<section id="${s.id}"><div class="shead"><h2><span class="num">${s.n}</span>${s.title}</h2>
+      <span class="count">${rows.length} of ${s.rows.length} systems</span></div><p class="sub">${s.sub}</p>
+      <div class="tblwrap"><table><thead><tr><th>System</th><th>Vendor products</th><th>Key data</th><th>Format</th><th>Delivery</th><th>TMF Open API</th><th>SID entity</th></tr></thead><tbody>`;
+    html += rows.length ? rows.map(r=>`<tr><td class="sys">${hi(r.sys)}<br><button type="button" class="sbtn" data-toggle="${encodeURIComponent(r.sys)}" aria-expanded="${state.open.has(r.sys)}"><span class="car">›</span>Samples</button></td><td class="ven">${vendorCell(r)}</td>
+      <td class="data">${hi(r.data)}</td><td class="fmt">${hi(r.fmt)}</td>
+      <td class="del"><div class="dchips">${r.del.map(d=>`<span class="dc ${d}">${d}</span>`).join("")}</div>${r.dn?`<div class="dnote">${hi(r.dn)}</div>`:""}</td>
+      <td class="api">${hi(r.api)}</td><td class="sid">${hi(r.sid)}</td></tr>`
+      + (state.open.has(r.sys) ? `<tr class="detail"><td colspan="7">${sampleHTML(r)}</td></tr>` : "")).join("")
+      : `<tr><td colspan="7" class="empty">No systems match these filters.</td></tr>`;
+    html += `</tbody></table></div></section>`;
+  });
+  const tr = TMF.filter(t=>!state.q || t.join(" ").toLowerCase().includes(state.q.toLowerCase())); counts.tmf = tr.length;
+  html += `<section id="tmf"><div class="shead"><h2><span class="num">4</span>Target TMF entities</h2><span class="count">${tr.length} of ${TMF.length} mappings</span></div>
+    <p class="sub">The TMF Open API and core SID entity each kind of use-case data maps to, with the systems that usually feed it.</p>
+    <div class="tblwrap"><table style="min-width:860px"><thead><tr><th>Use-case data</th><th>TMF Open API</th><th>Core SID entity</th><th>Typical source systems</th></tr></thead><tbody>`
+    + (tr.length ? tr.map(t=>`<tr><td class="sys">${hi(t[0])}</td><td class="api">${hi(t[1])}</td><td>${hi(t[2])}</td><td>${hi(t[3])}</td></tr>`).join("")
+       : `<tr><td colspan="4" class="empty">No mappings match this search.</td></tr>`)
+    + `</tbody></table></div></section>`;
+  const ent = entitiesHTML(); counts.entities = ent.count; html += ent.html;
+  html += `<section id="notes"><div class="shead"><h2>Delivery modes and notes</h2></div>
+    <p class="sub">How data leaves each source system, and what to watch for when building the feeds.</p>
+    <div class="legend">${MODES.map(m=>`<div><span class="dc ${m[0]}" style="align-self:flex-start">${m[0]}</span><span>${m[1]}</span></div>`).join("")}</div>
+    <div style="height:14px"></div>
+    <div class="notes">${NOTES.map(n=>`<div><b>${n[0]}</b><p>${n[1]}</p></div>`).join("")}</div></section>`;
+  if (typeof layersHTML === "function") html += layersHTML();
+  if (typeof physicalHTML === "function") html += physicalHTML();
+  main.innerHTML = html;
+  const toc = [["physical","Physical layer"],["layers","Data layer"],["bss","1 · BSS"],["oss","2 · OSS"],["nss","3 · NSS / core"],["tmf","4 · TMF mapping"],["entities","5 · TMF entities"],["notes","Notes"]];
+  document.getElementById("toc").innerHTML = toc.map(([id,l])=>`<a href="#${id}" data-id="${id}" class="${id===state.view?"on":""}" ${id===state.view?'aria-current="page"':""}>${l}${counts[id]!==undefined?`<span class="n">${counts[id]}</span>`:""}</a>`).join("");
+  main.querySelectorAll(":scope > section").forEach(s => { s.hidden = s.id !== state.view; });
+  const sysView = ["bss","oss","nss"].includes(state.view);
+  ["vendors","deliv","expand"].forEach(id => { document.getElementById(id).hidden = !sysView; });
+}
+
+const VIEWS = ["physical","layers","bss","oss","nss","tmf","entities","notes"];
+state.view = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "physical";
+function setView(v){ if (!VIEWS.includes(v) || v === state.view) return; state.view = v; render(); window.scrollTo({ top: 0 }); }
+document.getElementById("toc").addEventListener("click", e => { const a = e.target.closest("a[data-id]"); if (!a) return;
+  e.preventDefault(); setView(a.dataset.id); try { history.replaceState(null, "", "#" + a.dataset.id); } catch (err) { location.hash = a.dataset.id; } });
+window.addEventListener("hashchange", () => setView(location.hash.slice(1)));
+document.getElementById("q").addEventListener("input", e=>{ state.q = e.target.value.trim(); render(); });
+document.getElementById("reset").onclick = ()=>{ state.q=""; document.getElementById("q").value="";
+  state.vendors = new Set(VENDORS.map(v=>v[0])); state.deliv = new Set(); save(); renderControls(); render(); };
+/* ---------- Samples ---------- */
+state.open = new Set(); state.tab = {};
+const ALL_ROWS = [...BSS, ...OSS, ...NSS];
+const DIRECT_EXT = new Set(["csv","json","txt","md"]);
+let DL = null;
+
+function flat(o, p){ const out = [];
+  if (Array.isArray(o)) o.forEach((v,i)=>out.push(...flat(v, `${p}[${i}]`)));
+  else if (o && typeof o === "object") Object.entries(o).forEach(([k,v])=>out.push(...flat(v, p ? `${p}.${k}` : k)));
+  else out.push([p, o]);
+  return out; }
+function fmtSize(n){ return n < 1024 ? n + " B" : (n/1024).toFixed(1) + " KB"; }
+
+function sampleHTML(r){
+  const S = (window.SAMPLES || {})[r.sys];
+  if (!S) return `<div class="spanel"><span class="shint">Samples could not be loaded.</span></div>`;
+  const modes = r.del.filter(d => S[d]);
+  const cur = modes.includes(state.tab[r.sys]) ? state.tab[r.sys] : modes[0];
+  const id = encodeURIComponent(r.sys);
+  const tabs = `<div class="stabs" role="tablist">${modes.map(m=>`<button type="button" role="tab" class="stab ${m}" data-tab="${m}" data-sys="${id}" aria-selected="${m===cur}">${m}</button>`).join("")}</div>`;
+  const s = S[cur]; let body = "";
+  if (cur === "Table") {
+    body = `<div class="shint">Source table <code>${esc(s.name)}</code> · ${esc(s.src)}</div>
+      <div class="tblwrap"><table class="stbl"><thead><tr>${s.cols.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead>
+      <tbody>${s.rows.map(row=>`<tr>${row.map(v=>`<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  } else if (cur === "File") {
+    const lines = s.content.replace(/\n$/, "").split("\n");
+    const size = new Blob([s.content]).size;
+    const outName = s.saveAs || s.name; const ext = outName.split(".").pop().toLowerCase();
+    const how = DIRECT_EXT.has(ext) && outName.includes(".") ? outName : outName + ".zip";
+    body = `<div class="filecard"><div><div class="fname">${esc(s.name)}</div>
+        <div class="shint">${esc(s.note)} · ${lines.length} lines · ${fmtSize(size)} · downloads as <code>${esc(how)}</code></div></div>
+        <div class="factions"><button type="button" class="act primary dlbtn" data-dl="${id}">Download</button><button type="button" class="act" data-copy="${id}">Copy</button></div></div>
+      <pre class="preview">${esc(lines.slice(0, 40).join("\n"))}${lines.length > 40 ? "\n…" : ""}</pre>
+      <div class="fstatus" data-status="${id}" aria-live="polite"></div>`;
+  } else if (cur === "API") {
+    body = `<div class="apireq"><span class="m">${esc(s.method)}</span><code>${esc(s.path)}</code></div>
+      <div class="shint">${esc(s.src)} · <span class="status200">200 OK</span> · application/json</div>
+      <div class="tblwrap"><table class="stbl kv"><thead><tr><th>Field</th><th>Value</th></tr></thead>
+      <tbody>${flat(s.body, "").map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</tbody></table></div>`;
+  } else if (cur === "Stream") {
+    body = `<div class="streamhead"><span class="topic">${esc(s.topic)}</span><span class="shint">${esc(s.proto)} · ${s.events.length} records</span>
+        <button type="button" class="act" data-replay="${id}">Replay stream</button></div>
+      <ol class="stream" data-stream="${id}">${s.events.map((e,i)=>`<li><span class="off">#${1040 + i}</span><span class="ts">${esc(e.ts)}</span><span class="key">${esc(e.key)}</span><code>${esc(JSON.stringify(e.v))}</code></li>`).join("")}</ol>`;
+  }
+  return `<div class="spanel">${tabs}${body}</div>`;
+}
+
+/* ---------- TMF entity model ---------- */
+state.ent = ""; state.showCommon = false;
+const DOMAINS = [["BSS","Customer, commercial and money"],["OSS","Network management and assurance"],["NSS","Core network: subscriber, session, usage"]];
+
+function entMatches(e){ if (!state.q) return true; const q = state.q.toLowerCase();
+  return [e.name, e.api, e.sources, e.desc, ...e.fields.flat()].join(" ").toLowerCase().includes(q); }
+
+function entitiesHTML(){
+  const M = window.TMF_ENTITIES;
+  if (!M) return { count: 0, html: `<section id="entities"><div class="shead"><h2><span class="num">5</span>TMF entity model</h2></div><p class="sub">The entity definitions could not be loaded.</p></section>` };
+  let total = 0, shown = 0;
+  const cols = DOMAINS.map(([d, sub]) => {
+    const list = M[d].filter(entMatches); total += M[d].length; shown += list.length;
+    return `<div class="ecol" data-dom="${d}"><header><h3>${d}</h3><span class="count">${list.length} entities</span></header>
+      <div class="shint" style="padding:8px 14px 4px">${sub}</div>
+      <div class="elist">${list.length ? list.map(e => { const key = d + "|" + e.name;
+        return `<button type="button" class="ent" data-ent="${encodeURIComponent(key)}" aria-haspopup="dialog" aria-pressed="${state.ent === key}">
+          <span>${hi(e.name)}<br><span class="ef">${e.fields.length} fields · ${relsOf(e.name).length} links</span></span><span class="eapi">${e.api}</span></button>`; }).join("")
+        : `<div class="empty">No entities match this search.</div>`}</div></div>`;
+  }).join("");
+  return { count: shown, html: `<section id="entities"><div class="shead"><h2><span class="num">5</span>TMF entity model</h2><span class="count">${shown} of ${total} entities</span></div>
+    <p class="sub">TMF Open API entities grouped by the domain that usually feeds them. Select an entity to open its field definitions: types, descriptions and an example mapping from the sample data. Field lists follow the TMF v4/v5 schemas, trimmed to the attributes these use cases need.</p>
+    <div class="ecols">${cols}</div></section>` };
+}
+
+/* ---------- Relationships ---------- */
+function domOf(name){ const M = window.TMF_ENTITIES; for (const d of ["BSS","OSS","NSS"]) if (M[d].some(e => e.name === name)) return d; return "BSS"; }
+function apiOf(name){ const M = window.TMF_ENTITIES; return M[domOf(name)].find(e => e.name === name)?.api || ""; }
+function relsOf(name){ return (window.TMF_RELS || []).filter(r => r[0] === name || r[2] === name); }
+function card(field, kind){ return kind === "join" ? "value join" : field.includes("[]") ? "0..*" : "0..1"; }
+function trunc(s, n){ return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+
+function groupBy(list, keyIdx, fieldIdx){
+  const m = new Map();
+  list.forEach(r => { const k = r[keyIdx]; if (!m.has(k)) m.set(k, { name: k, fields: [], join: false }); const g = m.get(k); g.fields.push(r[fieldIdx]); if (r[4] === "join") g.join = true; });
+  return [...m.values()];
+}
+
+function relDiagram(name){
+  const R = window.TMF_RELS || [];
+  const inc = groupBy(R.filter(r => r[2] === name && r[0] !== name), 0, 1);   // others → this (field lives on the other entity)
+  const out = groupBy(R.filter(r => r[0] === name && r[2] !== name), 2, 1);   // this → others (field lives on this entity)
+  const W = 1000, BW = 290, BH = 46, GAP = 12, TOP = 34;
+  const n = Math.max(inc.length, out.length, 1);
+  const H = TOP + n * (BH + GAP) + 10;
+  const cx = (W - BW) / 2, cy = TOP + (H - TOP - 10) / 2 - 30, CH = 60;
+  const colTop = len => TOP + ((n - len) * (BH + GAP)) / 2;
+  const color = d => `var(--${d.toLowerCase()})`;
+  const node = (g, x, y, label) => { const d = domOf(g.name);
+    return `<g class="rnode" data-goto="${encodeURIComponent(g.name)}" tabindex="0" role="button" aria-label="Open ${esc(g.name)}">
+      <rect class="box" x="${x}" y="${y}" width="${BW}" height="${BH}" rx="6" fill="var(--surface)" stroke="${color(d)}" stroke-width="1.5"/>
+      <rect x="${x}" y="${y}" width="5" height="${BH}" rx="2" fill="${color(d)}"/>
+      <text x="${x + 14}" y="${y + 19}" font-family="IBM Plex Sans, system-ui, sans-serif" font-size="13" font-weight="600" fill="var(--fg)">${esc(trunc(g.name, 34))}</text>
+      <text x="${x + 14}" y="${y + 36}" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">${esc(trunc(label, 42))}</text></g>`; };
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Relationships of ${esc(name)}">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--muted)"/></marker></defs>
+    <text x="0" y="16" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1" fill="var(--muted)">REFERENCED BY (${inc.length})</text>
+    <text x="${W}" y="16" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1" fill="var(--muted)">REFERENCES (${out.length})</text>`;
+  let y0 = colTop(inc.length);
+  inc.forEach((g, i) => { const y = y0 + i * (BH + GAP);
+    svg += `<path d="M${BW} ${y + BH/2} C ${BW + 50} ${y + BH/2}, ${cx - 50} ${cy + CH/2}, ${cx - 2} ${cy + CH/2}" fill="none" stroke="var(--muted)" stroke-width="1.3" ${g.join ? 'stroke-dasharray="5 4"' : ""} marker-end="url(#arr)"/>`;
+    svg += node(g, 0, y, g.fields.join(", ") + " →"); });
+  y0 = colTop(out.length);
+  out.forEach((g, i) => { const y = y0 + i * (BH + GAP);
+    svg += `<path d="M${cx + BW} ${cy + CH/2} C ${cx + BW + 50} ${cy + CH/2}, ${W - BW - 50} ${y + BH/2}, ${W - BW - 2} ${y + BH/2}" fill="none" stroke="var(--muted)" stroke-width="1.3" ${g.join ? 'stroke-dasharray="5 4"' : ""} marker-end="url(#arr)"/>`;
+    svg += node(g, W - BW, y, "via " + g.fields.join(", ")); });
+  const d = domOf(name);
+  svg += `<rect x="${cx}" y="${cy}" width="${BW}" height="${CH}" rx="8" fill="${color(d)}"/>
+    <text x="${cx + BW/2}" y="${cy + 27}" text-anchor="middle" font-family="Archivo, Arial Narrow, sans-serif" font-size="16" font-weight="700" fill="var(--surface)">${esc(trunc(name, 30))}</text>
+    <text x="${cx + BW/2}" y="${cy + 46}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="var(--surface)">${esc(apiOf(name))} · ${d}</text>`;
+  if (!inc.length) svg += `<text x="${BW/2}" y="${cy + CH/2 + 4}" text-anchor="middle" font-size="12" fill="var(--muted)" font-family="IBM Plex Sans, sans-serif">No entity references this one</text>`;
+  if (!out.length) svg += `<text x="${W - BW/2}" y="${cy + CH/2 + 4}" text-anchor="middle" font-size="12" fill="var(--muted)" font-family="IBM Plex Sans, sans-serif">Holds no references</text>`;
+  return svg + `</svg>`;
+}
+
+function relTable(name){
+  const R = (window.TMF_RELS || []).filter(r => r[0] === name || r[2] === name);
+  if (!R.length) return `<p class="shint">No relationships defined for this entity.</p>`;
+  const rows = R.map(r => { const outgoing = r[0] === name; const other = outgoing ? r[2] : r[0];
+    const link = outgoing
+      ? `<code>${esc(name)}.${esc(r[1])}</code> → <code>${esc(r[2])}.${esc(r[3])}</code>`
+      : `<code>${esc(r[0])}.${esc(r[1])}</code> → <code>${esc(name)}.${esc(r[3])}</code>`;
+    return `<tr><td><span class="rdir">${outgoing ? "References →" : "← Referenced by"}</span></td>
+      <td><button type="button" class="rlink" data-goto="${encodeURIComponent(other)}">${esc(other)}</button><span class="dombadge ${domOf(other)}">${domOf(other)}</span></td>
+      <td style="white-space:normal">${link}</td><td class="fx">${card(r[1], r[4])}</td>
+      <td><span class="rkind ${r[4]}">${r[4] === "join" ? "staging join" : "TMF reference"}</span></td></tr>`; }).join("");
+  return `<div class="tblwrap"><table class="ftbl stbl" style="width:100%"><thead><tr><th>Direction</th><th>Related entity</th><th>Field connection</th><th>Cardinality</th><th>Link type</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function entityDetail(){
+  const M = window.TMF_ENTITIES; const [dom, name] = state.ent.split("|");
+  const e = (M[dom] || []).find(x => x.name === name); if (!e) return "";
+  const common = state.showCommon ? M.common.map(f => `<tr class="common"><td class="fn">${esc(f[0])}</td><td class="ft">${esc(f[1])}</td><td>${esc(f[2])}</td><td class="fx">${esc(f[3])}</td></tr>`).join("") : "";
+  const back = state.stack.length ? `<button type="button" class="back" data-back="1">← Back to ${esc(state.stack[state.stack.length - 1].split("|")[1])}</button>` : "";
+  return `<div class="edetail">
+    ${back}
+    <div class="ehead"><h3 id="etitle">${esc(e.name)} <span class="eapi">${e.api}</span><span class="edom">${dom}</span></h3>
+      <button type="button" class="xclose" data-close="1" aria-label="Close">×</button></div>
+    <dl class="emeta"><dt>Definition</dt><dd>${esc(e.desc)}</dd><dt>Fed by</dt><dd>${esc(e.sources)}</dd></dl>
+    <h4>Relationships</h4>
+    <div class="rlegend"><span><i style="background:var(--bss)"></i>BSS</span><span><i style="background:var(--oss)"></i>OSS</span><span><i style="background:var(--nss)"></i>NSS</span>
+      <span><span class="ln"></span>TMF reference (field holds the target id)</span><span><span class="ln dash"></span>Join in staging (identity or cell id)</span>
+      <span>Arrows point from the entity holding the field to the entity it points at. Select a box to open that entity.</span></div>
+    <div class="rdiag">${relDiagram(e.name)}</div>
+    ${relTable(e.name)}
+    <h4>Fields</h4>
+    <div class="streamhead"><span class="shint">${e.fields.length} entity fields${state.showCommon ? ` + ${M.common.length} common fields` : ""}. Array fields end in <code>[]</code>; dotted names are nested attributes.</span>
+      <button type="button" class="act" data-common="1">${state.showCommon ? "Hide" : "Show"} common fields (id, href, @type …)</button></div>
+    <div class="tblwrap"><table class="ftbl"><thead><tr><th>Field</th><th>Type</th><th>Description</th><th>Example / source mapping</th></tr></thead>
+    <tbody>${common}${e.fields.map(f => `<tr><td class="fn">${hi(f[0])}</td><td class="ft">${esc(f[1])}</td><td>${hi(f[2])}</td><td class="fx">${hi(f[3] || "")}</td></tr>`).join("")}</tbody></table></div></div>`;
+}
+
+const modal = document.getElementById("modal"); let lastFocus = null; state.stack = [];
+function gotoEntity(name){ if (state.ent) state.stack.push(state.ent); showEntity(domOf(name) + "|" + name); }
+function showEntity(key){ state.ent = key; modal.innerHTML = entityDetail(); modal.querySelector(".edetail").scrollTop = 0; modal.querySelector(".xclose")?.focus();
+  document.querySelectorAll("button.ent").forEach(b => b.setAttribute("aria-pressed", decodeURIComponent(b.dataset.ent) === key)); }
+function openEntity(key, from){
+  state.ent = key; lastFocus = from || null; state.stack = [];
+  modal.innerHTML = entityDetail(); modal.hidden = false; document.body.classList.add("modal-open");
+  document.querySelectorAll("button.ent").forEach(b => b.setAttribute("aria-pressed", decodeURIComponent(b.dataset.ent) === key));
+  modal.querySelector(".xclose")?.focus();
+}
+function closeEntity(){
+  modal.hidden = true; modal.innerHTML = ""; document.body.classList.remove("modal-open");
+  if (lastFocus && document.body.contains(lastFocus)) lastFocus.focus();
+}
+modal.addEventListener("click", ev => {
+  if (ev.target === modal) return closeEntity();
+  const g = ev.target.closest("[data-goto]"); if (g) return gotoEntity(decodeURIComponent(g.dataset.goto));
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.dataset.close) closeEntity();
+  else if (b.dataset.back) showEntity(state.stack.pop());
+  else if (b.dataset.common) { state.showCommon = !state.showCommon; const sc = modal.querySelector(".edetail").scrollTop;
+    modal.innerHTML = entityDetail(); modal.querySelector(".edetail").scrollTop = sc; modal.querySelector('[data-common]')?.focus(); }
+});
+document.addEventListener("keydown", ev => {
+  if (modal.hidden) return;
+  if (ev.key === "Escape") closeEntity();
+  else if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches("g.rnode")) { ev.preventDefault(); gotoEntity(decodeURIComponent(ev.target.dataset.goto)); }
+});
+
+function setStatus(id, msg){ const el = document.querySelector(`[data-status="${CSS.escape(id)}"]`); if (el) el.textContent = msg; }
+
+async function download(id){
+  const r = ALL_ROWS.find(x => x.sys === decodeURIComponent(id)); const s = window.SAMPLES[r.sys].File;
+  const outName = s.saveAs || s.name; const ext = outName.split(".").pop().toLowerCase();
+  if (!DL) { setStatus(id, "Downloads aren't available in this view. Use Copy instead."); return; }
+  try {
+    let filename = outName, data = s.content;
+    if (!(DIRECT_EXT.has(ext) && outName.includes("."))) {
+      if (!window.JSZip) { filename = outName + ".txt"; }
+      else { const zip = new JSZip(); zip.file(outName, s.content); data = await zip.generateAsync({ type: "blob" }); filename = outName + ".zip"; }
+    }
+    await DL.save({ filename, data });
+    setStatus(id, `Saved ${filename}.`);
+  } catch (e) {
+    const code = e && e.code;
+    setStatus(id, code === "declined" ? "Download cancelled." : code === "rate_limited" ? "Another download is waiting for confirmation. Try again in a moment." : "This file couldn't be downloaded here. Use Copy instead.");
+  }
+}
+
+async function copy(id){
+  const s = window.SAMPLES[decodeURIComponent(id)].File;
+  try { await navigator.clipboard.writeText(s.content); setStatus(id, "Copied to clipboard."); }
+  catch (e) { const pre = document.querySelector(`[data-status="${CSS.escape(id)}"]`)?.previousElementSibling;
+    if (pre) { const rg = document.createRange(); rg.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); }
+    setStatus(id, "Text selected. Press Ctrl+C or Cmd+C to copy."); }
+}
+
+function replay(id){
+  const ol = document.querySelector(`ol[data-stream="${CSS.escape(id)}"]`); if (!ol) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const items = [...ol.children]; items.forEach(li => { li.hidden = true; li.classList.remove("in"); });
+  items.forEach((li, i) => setTimeout(() => { li.hidden = false; li.classList.add("in"); }, 300 + i * 550));
+}
+
+document.getElementById("main").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.toggle) { const sys = decodeURIComponent(b.dataset.toggle); state.open.has(sys) ? state.open.delete(sys) : state.open.add(sys); render(); }
+  else if (b.dataset.tab) { state.tab[decodeURIComponent(b.dataset.sys)] = b.dataset.tab; render(); }
+  else if (b.dataset.dl) download(b.dataset.dl);
+  else if (b.dataset.copy) copy(b.dataset.copy);
+  else if (b.dataset.replay) replay(b.dataset.replay);
+  else if (b.dataset.ent) openEntity(decodeURIComponent(b.dataset.ent), b);
+});
+document.getElementById("expand").onclick = e => {
+  const allOpen = state.open.size === ALL_ROWS.length;
+  state.open = allOpen ? new Set() : new Set(ALL_ROWS.map(r => r.sys));
+  e.target.textContent = allOpen ? "Open all samples" : "Close all samples"; render(); };
+
+try { if (window.claude && window.claude.use) window.claude.use("downloads").then(d => { DL = d; document.body.classList.toggle("nodl", !d); }).catch(() => document.body.classList.add("nodl")); else document.body.classList.add("nodl"); }
+catch (e) { document.body.classList.add("nodl"); }
+
+renderControls(); render();
+</script>
+
+</body></html>

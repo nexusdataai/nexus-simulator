@@ -6,7 +6,9 @@ from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter(prefix="/api/v1/simulators", tags=["simulators"])
 
-_PRIMARY = ("sfdc", "oracle", "sap", "external", "tpm", "sourcing", "bss", "nss", "oss", "telco_golden")
+_PRIMARY = ("sfdc", "oracle", "sap", "external", "tpm", "sourcing", "bss", "nss", "oss")
+
+_LEGACY_TELCO = ("telco_golden", "telco_sources")
 
 
 @router.get("")
@@ -16,6 +18,12 @@ async def list_simulators(request: Request):
         raise HTTPException(status_code=503, detail="simulator not initialised")
     items = []
     for name in _PRIMARY:
+        svc = sim.registry.get(name)
+        if svc is None:
+            continue
+        status = svc.get_status() if hasattr(svc, "get_status") else {}
+        items.append({"service": name, **status})
+    for name in _LEGACY_TELCO:
         svc = sim.registry.get(name)
         if svc is None:
             continue

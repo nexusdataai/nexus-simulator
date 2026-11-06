@@ -1,0 +1,669 @@
+// Illustrative sample data for every system and delivery mode in the atlas.
+// One subscriber thread runs through the samples: customer C-100245, MSISDN 966591234567,
+// IMSI 001011234567890, home cell RYD-0421-L18-1 (eNodeB 104210). All values are invented.
+window.SAMPLES = {
+
+/* ============================ BSS ============================ */
+
+"CRM / customer master": {
+ Table: { name: "CRM.CUSTOMER_PROFILE", src: "Oracle DB view behind BES / Amdocs / Siebel CRM",
+  cols: ["CUSTOMER_ID","FULL_NAME","SEGMENT","ACCOUNT_TYPE","REGION","ACTIVATION_DATE","STATUS","KYC_STATUS"],
+  rows: [
+   ["C-100245","Faisal Al-Harbi","consumer","postpaid","Riyadh","2024-08-14","ACTIVE","VERIFIED"],
+   ["C-100246","Noura Al-Qahtani","consumer","prepaid","Jeddah","2026-03-02","ACTIVE","VERIFIED"],
+   ["C-100247","Al-Rashid Trading Co.","sme","postpaid","Dammam","2022-11-20","ACTIVE","VERIFIED"],
+   ["C-100248","Omar Al-Shehri","consumer","postpaid","Riyadh","2023-09-07","SUSPENDED","PENDING"] ] },
+ API: { method: "GET", path: "/tmf-api/customerManagement/v5/customer/C-100245", src: "TMF629 endpoint (Amdocs / Salesforce Communications Cloud)",
+  body: { id: "C-100245", "@type": "Customer", name: "Faisal Al-Harbi", status: "Approved",
+   engagedParty: { id: "P-55120", "@referredType": "Individual" },
+   account: [{ id: "BA-7781203", name: "Postpaid billing account", "@referredType": "BillingAccount" }],
+   characteristic: [{ name: "segment", value: "consumer" }, { name: "tenureMonths", value: 26 }, { name: "region", value: "Riyadh" }],
+   validFor: { startDateTime: "2024-08-14T09:12:00+03:00" } } },
+ File: { name: "customer_extract_20261105.csv", note: "Nightly CRM extract or Salesforce Bulk API 2.0 query result",
+  content:
+`Id,Name,Segment__c,Account_Type__c,Region__c,Activation_Date__c,Status__c,KYC_Status__c,Billing_Account__c
+C-100245,Faisal Al-Harbi,consumer,postpaid,Riyadh,2024-08-14,ACTIVE,VERIFIED,BA-7781203
+C-100246,Noura Al-Qahtani,consumer,prepaid,Jeddah,2026-03-02,ACTIVE,VERIFIED,BA-7781204
+C-100247,Al-Rashid Trading Co.,sme,postpaid,Dammam,2022-11-20,ACTIVE,VERIFIED,BA-7781205
+C-100248,Omar Al-Shehri,consumer,postpaid,Riyadh,2023-09-07,SUSPENDED,PENDING,BA-7781206
+C-100249,Hessa Al-Mutairi,consumer,prepaid,Makkah,2025-12-18,ACTIVE,VERIFIED,BA-7781207
+` }
+},
+
+"Product catalog": {
+ Table: { name: "PC.PRODUCT_OFFERING", src: "Catalog schema (BES Product Catalog / Amdocs Catalog)",
+  cols: ["OFFER_ID","OFFER_NAME","OFFER_TYPE","PRICE_SAR","RECURRENCE","DATA_GB","VOICE_MIN","LIFECYCLE"],
+  rows: [
+   ["PO-POST-299","Postpaid 299","plan","299.00","monthly","25","unlimited on-net","Launched"],
+   ["PO-POST-499","Postpaid 499","plan","499.00","monthly","60","unlimited","Launched"],
+   ["PO-POST-999","Postpaid 999","plan","999.00","monthly","unlimited (FUP 300)","unlimited","Launched"],
+   ["PO-ADD-STREAMPLUS","StreamPlus VIP add-on","add-on","30.00","monthly","—","—","Launched"] ] },
+ API: { method: "GET", path: "/tmf-api/productCatalogManagement/v5/productOffering/PO-POST-499", src: "TMF620 endpoint",
+  body: { id: "PO-POST-499", "@type": "ProductOffering", name: "Postpaid 499", lifecycleStatus: "Launched", isBundle: true, version: "3.1",
+   productSpecification: { id: "PS-MOBILE-POSTPAID", name: "Mobile postpaid line" },
+   productOfferingPrice: [{ id: "POP-499-MRC", name: "Monthly fee", priceType: "recurring", recurringChargePeriodType: "month", price: { unit: "SAR", value: 499 } }],
+   productOfferingTerm: [{ name: "12-month commitment", duration: { amount: 12, units: "month" } }],
+   validFor: { startDateTime: "2026-01-01T00:00:00+03:00" } } },
+ File: { name: "catalog_export_20261105.json", note: "Full catalog export, run after each catalog release",
+  content: JSON.stringify([
+   { id: "PO-POST-299", name: "Postpaid 299", type: "plan", price: { value: 299, unit: "SAR", period: "month" }, allowances: { dataGB: 25, voice: "unlimited on-net" }, status: "Launched" },
+   { id: "PO-POST-499", name: "Postpaid 499", type: "plan", price: { value: 499, unit: "SAR", period: "month" }, allowances: { dataGB: 60, voice: "unlimited" }, status: "Launched" },
+   { id: "PO-POST-999", name: "Postpaid 999", type: "plan", price: { value: 999, unit: "SAR", period: "month" }, allowances: { dataGB: null, fupGB: 300, voice: "unlimited" }, status: "Launched" },
+   { id: "PO-ADD-STREAMPLUS", name: "StreamPlus VIP add-on", type: "add-on", price: { value: 30, unit: "SAR", period: "month" }, status: "Launched" }
+  ], null, 2) }
+},
+
+"Order management": {
+ Table: { name: "OM.ORDER_LINE", src: "Order management schema",
+  cols: ["ORDER_ID","CUSTOMER_ID","ACTION","OFFER_FROM","OFFER_TO","CHANNEL","STATUS","CREATED_AT"],
+  rows: [
+   ["PORD-88412","C-100245","modify","Postpaid 499","Postpaid 299","Nimbus app","COMPLETED","2026-11-02 18:41"],
+   ["PORD-88413","C-100246","add","—","StreamPlus VIP add-on","USSD","COMPLETED","2026-11-02 19:05"],
+   ["PORD-88414","C-100248","suspend","Postpaid 499","—","Back office","IN_PROGRESS","2026-11-03 08:12"],
+   ["PORD-88415","C-100249","simSwap","—","—","Retail store","COMPLETED","2026-11-03 11:30"] ] },
+ API: { method: "GET", path: "/tmf-api/productOrderingManagement/v5/productOrder/PORD-88412", src: "TMF622 endpoint",
+  body: { id: "PORD-88412", "@type": "ProductOrder", state: "completed", orderDate: "2026-11-02T18:41:07+03:00", completionDate: "2026-11-02T18:43:55+03:00",
+   channel: [{ id: "CH-APP", name: "Nimbus app" }],
+   productOrderItem: [{ id: "1", action: "modify", state: "completed", product: { id: "PRD-9001245" }, productOffering: { id: "PO-POST-299", name: "Postpaid 299" } }],
+   relatedParty: [{ id: "C-100245", role: "Customer", "@referredType": "Customer" }] } },
+ Stream: { topic: "bss.productorder.events", proto: "Kafka · JSON (TMF688 event envelope)",
+  events: [
+   { ts: "2026-11-02T18:41:07.412+03:00", key: "PORD-88412", v: { eventType: "ProductOrderCreateEvent", state: "acknowledged", action: "modify", to: "PO-POST-299" } },
+   { ts: "2026-11-02T18:41:09.020+03:00", key: "PORD-88412", v: { eventType: "ProductOrderStateChangeEvent", state: "inProgress" } },
+   { ts: "2026-11-02T18:43:55.731+03:00", key: "PORD-88412", v: { eventType: "ProductOrderStateChangeEvent", state: "completed" } },
+   { ts: "2026-11-02T19:05:12.118+03:00", key: "PORD-88413", v: { eventType: "ProductOrderCreateEvent", state: "acknowledged", action: "add", to: "PO-ADD-STREAMPLUS" } } ] }
+},
+
+"Subscriptions / installed base": {
+ Table: { name: "INV.SUBSCRIBER_PRODUCT", src: "Product inventory schema",
+  cols: ["PRODUCT_ID","CUSTOMER_ID","MSISDN","OFFER","STATUS","START_DATE","CONTRACT_END","INSTALMENTS_LEFT"],
+  rows: [
+   ["PRD-9001245","C-100245","966591234567","Postpaid 299","active","2024-08-14","2026-12-14","2"],
+   ["PRD-9001246","C-100246","966597654321","Prepaid Shabab","active","2026-03-02","—","—"],
+   ["PRD-9001247","C-100247","966590011223","Business 799","active","2022-11-20","2027-05-20","0"],
+   ["PRD-9001248","C-100248","966593344556","Postpaid 499","suspended","2023-09-07","2026-11-30","5"] ] },
+ API: { method: "GET", path: "/tmf-api/productInventory/v5/product/PRD-9001245", src: "TMF637 endpoint",
+  body: { id: "PRD-9001245", "@type": "Product", name: "Postpaid 299", status: "active", startDate: "2024-08-14T09:30:00+03:00",
+   productOffering: { id: "PO-POST-299", name: "Postpaid 299" },
+   productCharacteristic: [{ name: "MSISDN", value: "966591234567" }, { name: "IMSI", value: "001011234567890" }],
+   agreementItem: [{ id: "AG-55871", name: "12-month commitment", endDate: "2026-12-14" }],
+   relatedParty: [{ id: "C-100245", role: "Customer" }] } }
+},
+
+"Online charging (OCS / CCS / CHF)": {
+ File: { name: "CBS_EDR_RATED_20261105_1400_0017.csv", note: "Rated EDR file, pipe-delimited, every 15 minutes",
+  content:
+`EVENT_ID|MSISDN|SERVICE|RATING_GROUP|START_TIME|DURATION_S|VOLUME_KB|CHARGE_SAR|BALANCE_AFTER|BUCKET
+E8812340001|966591234567|DATA|100|20261105140212|900|184320|0.00|3.21GB|PO-POST-299 data
+E8812340002|966597654321|VOICE|10|20261105140431|142|0|0.48|12.36SAR|main
+E8812340003|966597654321|SMS|20|20261105140502|0|0|0.15|12.21SAR|main
+E8812340004|966591234567|DATA|200|20261105141010|300|61440|0.00|3.15GB|PO-POST-299 data
+E8812340005|966593344556|DATA|100|20261105141133|0|0|0.00|BARRED|—
+` },
+ Stream: { topic: "ocs.balance.notifications", proto: "Kafka · JSON",
+  events: [
+   { ts: "2026-11-05T14:10:12.004+03:00", key: "966591234567", v: { event: "THRESHOLD_REACHED", bucket: "data", usedPct: 90, remaining: "3.15 GB" } },
+   { ts: "2026-11-05T14:22:40.511+03:00", key: "966597654321", v: { event: "RECHARGE", amountSAR: 30, channel: "voucher", balanceAfterSAR: 42.21 } },
+   { ts: "2026-11-05T14:31:03.877+03:00", key: "966591234567", v: { event: "FUP_LIMIT_HIT", bucket: "data", action: "throttle_1mbps" } },
+   { ts: "2026-11-05T14:35:18.209+03:00", key: "966593344556", v: { event: "BALANCE_EXPIRED", bucket: "bonus_data", expired: "2.00 GB" } } ] },
+ API: { method: "GET", path: "/tmf-api/prepayBalanceManagement/v5/bucket?relatedParty.id=C-100245&name=data", src: "TMF654 endpoint",
+  body: { id: "BKT-77120", "@type": "Bucket", name: "Monthly data allowance", status: "active", isShared: false,
+   remainingValue: { amount: 3.15, units: "GB" }, reservedValue: { amount: 0.05, units: "GB" },
+   validFor: { startDateTime: "2026-10-14T00:00:00+03:00", endDateTime: "2026-11-13T23:59:59+03:00" },
+   product: { id: "PRD-9001245" }, partyAccount: { id: "BA-7781203" } } }
+},
+
+"Mediation": {
+ File: { name: "MED_USAGE_NORMALISED_20261105_14.csv", note: "Normalised output after ASN.1 decoding, hourly",
+  content:
+`record_id,source_node,record_type,imsi,msisdn,start_time,duration_s,uplink_bytes,downlink_bytes,rat,ecgi,apn
+MD-00451-001,PGW01,PGW-CDR,001011234567890,966591234567,2026-11-05T14:00:12+03:00,900,8123456,180112334,EUTRAN,001-01-104210-1,internet.nimbus
+MD-00451-002,MSC01,MOC,001011234567890,966591234567,2026-11-05T14:03:40+03:00,184,0,0,UTRAN,001-01-3311-28401,
+MD-00451-003,SCSCF01,IMS-VOLTE,001017654321000,966597654321,2026-11-05T14:04:31+03:00,142,0,0,EUTRAN,001-01-104388-2,ims
+MD-00451-004,PGW02,PGW-CDR,001013344556677,966593344556,2026-11-05T14:11:33+03:00,0,0,0,NR,001-01-0000021042-3,internet.nimbus
+` },
+ Stream: { topic: "mediation.usage.normalised", proto: "Kafka · Avro (shown as JSON)",
+  events: [
+   { ts: "2026-11-05T14:15:02.100+03:00", key: "001011234567890", v: { recordType: "PGW-CDR", dlMB: 171.8, ulMB: 7.7, ecgi: "001-01-104210-1" } },
+   { ts: "2026-11-05T14:15:02.104+03:00", key: "001011234567890", v: { recordType: "MOC", durationS: 184, calledNumber: "96611xxxxxxx" } },
+   { ts: "2026-11-05T14:15:02.131+03:00", key: "001017654321000", v: { recordType: "IMS-VOLTE", durationS: 142, cause: "normalRelease" } } ] }
+},
+
+"Billing / invoicing": {
+ Table: { name: "BILLING.INVOICE", src: "Billing schema (CBS / BSCS iX / BRM style)",
+  cols: ["INVOICE_NO","ACCOUNT_ID","CYCLE","AMOUNT_SAR","PREV_AMOUNT_SAR","ADJUSTMENT_SAR","DUE_DATE","STATUS"],
+  rows: [
+   ["INV-2026-10-7781203","BA-7781203","2026-10","343.85","574.85","0.00","2026-11-20","OPEN"],
+   ["INV-2026-10-7781205","BA-7781205","2026-10","2,412.50","2,398.00","-50.00","2026-11-20","OPEN"],
+   ["INV-2026-10-7781206","BA-7781206","2026-10","1,104.20","574.85","0.00","2026-11-20","DISPUTED"],
+   ["INV-2026-09-7781203","BA-7781203","2026-09","574.85","574.85","0.00","2026-10-20","PAID"] ] },
+ File: { name: "INV-2026-10-7781203.xml", note: "Bill XML sent to print / e-bill; shipped zipped per bill run",
+  content:
+`<?xml version="1.0" encoding="UTF-8"?>
+<Invoice number="INV-2026-10-7781203" currency="SAR">
+  <Account id="BA-7781203" customerId="C-100245"/>
+  <BillPeriod start="2026-10-14" end="2026-11-13"/>
+  <IssueDate>2026-11-14</IssueDate>
+  <DueDate>2026-11-20</DueDate>
+  <Charges>
+    <Recurring offer="Postpaid 299" amount="299.00"/>
+    <Usage type="roaming-data" country="ARE" volumeMB="420" amount="0.00"/>
+    <OneTime type="device-instalment" amount="0.00"/>
+  </Charges>
+  <Tax type="VAT" rate="15" amount="44.85"/>
+  <Total>343.85</Total>
+  <PreviousBalance>0.00</PreviousBalance>
+</Invoice>
+` }
+},
+
+"Payments and collections": {
+ Table: { name: "AR.PAYMENT", src: "Accounts receivable schema",
+  cols: ["PAYMENT_ID","ACCOUNT_ID","AMOUNT_SAR","METHOD","RESULT","FAILURE_REASON","PAID_AT","DUNNING_STAGE"],
+  rows: [
+   ["PAY-55190","BA-7781203","574.85","Mada card","SUCCESS","—","2026-10-18 21:14","0"],
+   ["PAY-55191","BA-7781206","574.85","Direct debit","FAILED","insufficient funds","2026-10-20 06:00","2"],
+   ["PAY-55192","BA-7781206","574.85","Direct debit","FAILED","insufficient funds","2026-10-27 06:00","2"],
+   ["PAY-55193","BA-7781205","2,398.00","SADAD","SUCCESS","—","2026-10-19 10:02","0"] ] },
+ API: { method: "GET", path: "/tmf-api/paymentManagement/v5/payment/PAY-55191", src: "TMF676 endpoint",
+  body: { id: "PAY-55191", "@type": "Payment", status: "failed", statusReason: "insufficient funds", paymentDate: "2026-10-20T06:00:00+03:00",
+   amount: { unit: "SAR", value: 574.85 }, paymentMethod: { id: "PM-DD-0031", name: "Direct debit", "@referredType": "PaymentMethod" },
+   account: { id: "BA-7781206", "@referredType": "BillingAccount" }, payer: { id: "C-100248", role: "Payer" } } }
+},
+
+"Customer care / complaints": {
+ Table: { name: "CARE.INTERACTION", src: "Care / case tables (Service Cloud Case, Siebel Service, Remedy)",
+  cols: ["CASE_ID","CUSTOMER_ID","CHANNEL","CATEGORY","SUBCATEGORY","STATUS","OPENED_AT","REPEAT_30D"],
+  rows: [
+   ["CS-240981","C-100245","Call center","Network","Slow data at home","IN_PROGRESS","2026-11-01 20:15","3"],
+   ["CS-240982","C-100248","Chat","Billing","Disputed charges","OPEN","2026-11-02 10:41","1"],
+   ["CS-240983","C-100245","Nimbus app","Network","Call drops","OPEN","2026-11-04 09:02","3"],
+   ["CS-240984","C-100246","Retail store","Plan","Plan change query","CLOSED","2026-11-04 17:30","0"] ] },
+ API: { method: "GET", path: "/tmf-api/troubleTicket/v5/troubleTicket/CS-240983", src: "TMF621 endpoint",
+  body: { id: "CS-240983", "@type": "TroubleTicket", name: "Call drops at home", ticketType: "Complaint", severity: "Major", status: "inProgress",
+   description: "Customer reports repeated call drops and slow data at home since 28 Oct.", creationDate: "2026-11-04T09:02:11+03:00",
+   channel: { name: "Nimbus app" }, relatedParty: [{ id: "C-100245", role: "Customer" }],
+   relatedEntity: [{ id: "RYD-0421-L18-1", role: "ServingCell", "@referredType": "Resource" }] } }
+},
+
+"Campaign / offers": {
+ Table: { name: "CMP.OFFER_HISTORY", src: "Campaign management schema",
+  cols: ["OFFER_ID","CUSTOMER_ID","CAMPAIGN","CHANNEL","SENT_AT","RESPONSE","RESPONDED_AT"],
+  rows: [
+   ["OF-310221","C-100245","Retention 20% off 499","SMS","2026-10-30 12:00","ignored","—"],
+   ["OF-310222","C-100246","Upgrade to Postpaid 299","App push","2026-10-30 12:00","accepted","2026-10-30 12:47"],
+   ["OF-310223","C-100247","Business 5G router","Email","2026-10-31 09:00","clicked","2026-10-31 11:15"],
+   ["OF-310224","C-100245","StreamPlus VIP free month","App push","2026-11-03 18:00","ignored","—"] ] },
+ File: { name: "campaign_responses_20261104.csv", note: "Daily response file from the campaign tool",
+  content:
+`offer_id,customer_id,campaign_code,channel,sent_at,response,responded_at
+OF-310221,C-100245,RET-499-20,SMS,2026-10-30T12:00:00+03:00,ignored,
+OF-310222,C-100246,UPG-PRE-POST299,PUSH,2026-10-30T12:00:00+03:00,accepted,2026-10-30T12:47:10+03:00
+OF-310223,C-100247,B2B-5GFWA,EMAIL,2026-10-31T09:00:00+03:00,clicked,2026-10-31T11:15:42+03:00
+OF-310224,C-100245,VAS-STREAMPLUS-1M,PUSH,2026-11-03T18:00:00+03:00,ignored,
+` }
+},
+
+"Customer data platform / event hub": {
+ Stream: { topic: "cdp.customer.events", proto: "Kafka · JSON (TMF688 envelope)",
+  events: [
+   { ts: "2026-11-05T13:58:41.220+03:00", key: "C-100245", v: { eventType: "AppLogin", channel: "Nimbus app", os: "iOS" } },
+   { ts: "2026-11-05T13:59:10.003+03:00", key: "C-100245", v: { eventType: "PageView", page: "/plans/compare" } },
+   { ts: "2026-11-05T14:00:27.645+03:00", key: "C-100245", v: { eventType: "PageView", page: "/account/cancel-line" } },
+   { ts: "2026-11-05T14:02:03.190+03:00", key: "C-100247", v: { eventType: "OfferClick", offerId: "OF-310223" } } ] },
+ Table: { name: "CDP.UNIFIED_PROFILE", src: "Unified profile table (Data Hub / Data Cloud / Unity CDP)",
+  cols: ["CUSTOMER_ID","PRIMARY_MSISDN","LIFETIME_VALUE_SAR","APP_SESSIONS_30D","CANCEL_PAGE_VISITS_30D","LAST_CHANNEL","CONSENT_MARKETING"],
+  rows: [
+   ["C-100245","966591234567","9,880","14","2","Nimbus app","true"],
+   ["C-100246","966597654321","610","22","0","USSD","true"],
+   ["C-100247","966590011223","58,240","3","0","Email","false"],
+   ["C-100248","966593344556","6,320","1","0","Chat","true"] ] },
+ File: { name: "cdp_events_2026-11-05_14.parquet", saveAs: "cdp_events_2026-11-05_14.jsonl", note: "Hourly Parquet drop; the sample download carries the same rows as JSON Lines",
+  content:
+`{"event_id":"ev-9f12","customer_id":"C-100245","event_type":"AppLogin","channel":"Nimbus app","ts":"2026-11-05T13:58:41+03:00"}
+{"event_id":"ev-9f13","customer_id":"C-100245","event_type":"PageView","page":"/plans/compare","ts":"2026-11-05T13:59:10+03:00"}
+{"event_id":"ev-9f14","customer_id":"C-100245","event_type":"PageView","page":"/account/cancel-line","ts":"2026-11-05T14:00:27+03:00"}
+{"event_id":"ev-9f15","customer_id":"C-100247","event_type":"OfferClick","offer_id":"OF-310223","ts":"2026-11-05T14:02:03+03:00"}
+` }
+},
+
+"MNP / port-out": {
+ File: { name: "MNP_PORTOUT_REQ_20261105.csv", note: "Daily port-out request file from the clearinghouse",
+  content:
+`request_id,msisdn,donor_operator,recipient_operator,request_time,porting_window,status
+PR-2026-0458812,966593344556,NIMBUS,ORBIT,2026-11-05T09:14:22+03:00,2026-11-06T02:00:00+03:00,PENDING_DONOR
+PR-2026-0458813,966598877665,NIMBUS,VERTEX,2026-11-05T10:01:09+03:00,2026-11-06T02:00:00+03:00,PENDING_DONOR
+PR-2026-0458814,966590102030,NIMBUS,ORBIT,2026-11-05T11:47:55+03:00,2026-11-07T02:00:00+03:00,REJECTED_DEBT
+` },
+ API: { method: "GET", path: "/mnp/v1/portRequests/PR-2026-0458812", src: "Operator MNP gateway REST",
+  body: { requestId: "PR-2026-0458812", msisdn: "966593344556", donor: "NIMBUS", recipient: "ORBIT", status: "PENDING_DONOR",
+   requestTime: "2026-11-05T09:14:22+03:00", portingWindow: "2026-11-06T02:00:00+03:00",
+   validation: { idMatch: true, outstandingDebtSAR: 1104.20, contractActive: true } } }
+},
+
+"Digital (app / web)": {
+ Stream: { topic: "digital.clickstream", proto: "Kafka · JSON",
+  events: [
+   { ts: "2026-11-05T13:59:10.003+03:00", key: "sess-77a1", v: { customerId: "C-100245", screen: "PlanCompare", action: "view" } },
+   { ts: "2026-11-05T13:59:44.512+03:00", key: "sess-77a1", v: { customerId: "C-100245", screen: "PlanCompare", action: "select", plan: "PO-POST-299" } },
+   { ts: "2026-11-05T14:00:27.645+03:00", key: "sess-77a1", v: { customerId: "C-100245", screen: "CancelLine", action: "view" } },
+   { ts: "2026-11-05T14:01:02.090+03:00", key: "sess-77a1", v: { customerId: "C-100245", screen: "CancelLine", action: "exit" } } ] },
+ File: { name: "app_sessions_20261105.json", note: "Daily session summary export",
+  content: JSON.stringify([
+   { session: "sess-77a1", customerId: "C-100245", start: "2026-11-05T13:58:41+03:00", durationS: 141, screens: ["Home","PlanCompare","CancelLine"] },
+   { session: "sess-77a2", customerId: "C-100246", start: "2026-11-05T14:05:12+03:00", durationS: 64, screens: ["Home","Recharge"] }
+  ], null, 2) }
+},
+
+/* ============================ OSS ============================ */
+
+"Element manager: Fault (FM)": {
+ Stream: { topic: "ENM FM NBI → staging alarm forwarder", proto: "SNMP trap / Kafka · 3GPP alarm fields",
+  events: [
+   { ts: "2026-11-05T13:42:07.000+03:00", key: "ALM-9930021", v: { notificationType: "notifyNewAlarm", objectInstance: "MeContext=ENB104210,EUtranCellFDD=RYD-0421-L18-1", eventType: "communicationsAlarm", probableCause: "LossOfSignal", specificProblem: "Cell Unavailable", perceivedSeverity: "CRITICAL" } },
+   { ts: "2026-11-05T13:42:09.000+03:00", key: "ALM-9930022", v: { notificationType: "notifyNewAlarm", objectInstance: "MeContext=ENB104210,Transport=1", eventType: "communicationsAlarm", probableCause: "LinkFailure", specificProblem: "S1 Link Down", perceivedSeverity: "MAJOR" } },
+   { ts: "2026-11-05T15:08:51.000+03:00", key: "ALM-9930022", v: { notificationType: "notifyClearedAlarm", perceivedSeverity: "CLEARED" } },
+   { ts: "2026-11-05T15:09:30.000+03:00", key: "ALM-9930021", v: { notificationType: "notifyClearedAlarm", perceivedSeverity: "CLEARED" } } ] },
+ API: { method: "GET", path: "/tmf-api/alarmManagement/v5/alarm/ALM-9930021", src: "TMF642 view of the alarm (or vendor alarm resync API)",
+  body: { id: "ALM-9930021", "@type": "Alarm", alarmType: "communicationsAlarm", perceivedSeverity: "critical", probableCause: "lossOfSignal",
+   specificProblem: "Cell Unavailable", state: "cleared", ackState: "acknowledged", sourceSystemId: "ENM-RYD-01",
+   alarmRaisedTime: "2026-11-05T13:42:07+03:00", alarmClearedTime: "2026-11-05T15:09:30+03:00",
+   alarmedObject: { id: "RYD-0421-L18-1", "@referredType": "Resource" } } }
+},
+
+"Element manager: Performance (PM)": {
+ File: { name: "A20261105.1400+0300-1415+0300_SubNetwork=RYD,MeContext=ENB104210_statsfile.xml", note: "3GPP TS 32.435 measurement file, one per node per 15 minutes, delivered gzip",
+  content:
+`<?xml version="1.0" encoding="UTF-8"?>
+<measCollecFile xmlns="http://www.3gpp.org/ftp/specs/archive/32_series/32.435#measCollec">
+  <fileHeader fileFormatVersion="32.435 V10.0" vendorName="Ericsson">
+    <fileSender localDn="SubNetwork=RYD,MeContext=ENB104210"/>
+    <measCollec beginTime="2026-11-05T14:00:00+03:00"/>
+  </fileHeader>
+  <measData>
+    <managedElement localDn="ENB104210"/>
+    <measInfo measInfoId="EUtranCellFDD">
+      <granPeriod duration="PT900S" endTime="2026-11-05T14:15:00+03:00"/>
+      <measType p="1">pmRrcConnEstabSucc</measType>
+      <measType p="2">pmRrcConnEstabAtt</measType>
+      <measType p="3">pmErabRelAbnormalEnbAct</measType>
+      <measType p="4">pmPdcpVolDlDrb</measType>
+      <measType p="5">pmPrbUsedDlAvg</measType>
+      <measValue measObjLdn="EUtranCellFDD=RYD-0421-L18-1">
+        <r p="1">0</r><r p="2">412</r><r p="3">0</r><r p="4">0</r><r p="5">0</r>
+        <suspect>true</suspect>
+      </measValue>
+      <measValue measObjLdn="EUtranCellFDD=RYD-0421-L18-2">
+        <r p="1">3911</r><r p="2">3958</r><r p="3">41</r><r p="4">48210933</r><r p="5">88</r>
+      </measValue>
+    </measInfo>
+  </measData>
+  <fileFooter><measCollec endTime="2026-11-05T14:15:00+03:00"/></fileFooter>
+</measCollecFile>
+` }
+},
+
+"Element manager: Configuration (CM)": {
+ File: { name: "BulkCM_export_RYD_20261105_0200.xml", note: "3GPP Bulk CM (TS 32.616) nightly export",
+  content:
+`<?xml version="1.0" encoding="UTF-8"?>
+<bulkCmConfigDataFile xmlns:xn="genericNrm.xsd" xmlns:un="utranNrm.xsd" xmlns:es="EricssonSpecificAttributes.xsd">
+  <fileHeader fileFormatVersion="32.615 V6.3" vendorName="Ericsson"/>
+  <configData dnPrefix="SubNetwork=RYD">
+    <xn:MeContext id="ENB104210">
+      <xn:ManagedElement id="1">
+        <xn:VsDataContainer id="RYD-0421-L18-1">
+          <xn:attributes>
+            <xn:vsDataType>vsDataEUtranCellFDD</xn:vsDataType>
+            <es:vsDataEUtranCellFDD>
+              <es:administrativeState>UNLOCKED</es:administrativeState>
+              <es:operationalState>DISABLED</es:operationalState>
+              <es:earfcndl>1300</es:earfcndl>
+              <es:physicalLayerCellId>211</es:physicalLayerCellId>
+              <es:tac>4210</es:tac>
+              <es:electricalTilt>40</es:electricalTilt>
+            </es:vsDataEUtranCellFDD>
+          </xn:attributes>
+        </xn:VsDataContainer>
+      </xn:ManagedElement>
+    </xn:MeContext>
+  </configData>
+  <fileFooter dateTime="2026-11-05T02:00:00+03:00"/>
+</bulkCmConfigDataFile>
+` },
+ API: { method: "POST", path: "/server-scripting/services/command  ·  cmedit get ENB104210 EUtranCellFDD.(administrativeState,operationalState,tac,electricalTilt)", src: "ENM scripting REST (CLI over REST)",
+  body: { FDN: "SubNetwork=RYD,MeContext=ENB104210,ManagedElement=1,ENodeBFunction=1,EUtranCellFDD=RYD-0421-L18-1",
+   administrativeState: "UNLOCKED", operationalState: "DISABLED", tac: 4210, electricalTilt: 40,
+   lastChange: { attribute: "electricalTilt", from: 20, to: 40, at: "2026-10-27T01:12:00+03:00", by: "SON" } } }
+},
+
+"PM / statistics warehouse": {
+ Table: { name: "DC_E_ERBS_EUTRANCELLFDD_DAY", src: "ENIQ Statistics / PRS daily KPI table",
+  cols: ["DATE_ID","ERBS","EUTRANCELLFDD","AVAILABILITY_PCT","RRC_SR_PCT","ERAB_DROP_PCT","DL_THP_MBPS","PRB_UTIL_DL_PCT"],
+  rows: [
+   ["2026-11-04","ENB104210","RYD-0421-L18-1","71.4","96.2","2.81","9.4","91"],
+   ["2026-11-04","ENB104210","RYD-0421-L18-2","100.0","99.1","0.62","21.7","74"],
+   ["2026-10-26","ENB104210","RYD-0421-L18-1","100.0","99.4","0.48","27.9","58"],
+   ["2026-11-04","ENB104388","JED-0388-L21-2","99.9","99.3","0.55","32.0","49"] ] },
+ File: { name: "PRS_daily_kpi_RYD_20261104.csv", note: "Scheduled report export from the KPI warehouse",
+  content:
+`date,site,cell,availability_pct,rrc_sr_pct,erab_drop_pct,dl_thp_mbps,prb_util_dl_pct
+2026-11-04,ENB104210,RYD-0421-L18-1,71.4,96.2,2.81,9.4,91
+2026-11-04,ENB104210,RYD-0421-L18-2,100.0,99.1,0.62,21.7,74
+2026-11-04,ENB104210,RYD-0421-L21-1,100.0,99.5,0.40,30.2,52
+2026-11-04,ENB104211,RYD-0422-L18-1,99.8,99.2,0.71,24.8,66
+` }
+},
+
+"Transport / IP NMS": {
+ Stream: { topic: "nce.telemetry.interface", proto: "gRPC telemetry → Kafka · JSON",
+  events: [
+   { ts: "2026-11-05T13:40:00.000+03:00", key: "MW-RYD-0421-0388", v: { ifName: "GE0/2/1", utilInPct: 62, utilOutPct: 71, operStatus: "up" } },
+   { ts: "2026-11-05T13:41:56.000+03:00", key: "MW-RYD-0421-0388", v: { event: "LINK_DOWN", alarm: "MW_RDI", severity: "major" } },
+   { ts: "2026-11-05T13:45:00.000+03:00", key: "MW-RYD-0421-0388", v: { ifName: "GE0/2/1", utilInPct: 0, utilOutPct: 0, operStatus: "down" } },
+   { ts: "2026-11-05T15:08:40.000+03:00", key: "MW-RYD-0421-0388", v: { event: "LINK_UP", alarm: "MW_RDI", severity: "cleared" } } ] },
+ API: { method: "GET", path: "/restconf/data/ietf-network:networks/network=transport/link=MW-RYD-0421-0388", src: "iMaster NCE / NSP RESTCONF",
+  body: { "link-id": "MW-RYD-0421-0388", type: "microwave", source: { node: "RYD-0421", tp: "GE0/2/1" }, destination: { node: "RYD-0388", tp: "GE0/1/3" },
+   capacityMbps: 1000, operStatus: "up", lastStateChange: "2026-11-05T15:08:40+03:00" } },
+ File: { name: "NCE_PM_link_util_20261105_14.csv", note: "15-minute link utilisation export",
+  content:
+`period_start,link_id,if_name,util_in_pct,util_out_pct,errored_seconds,unavailable_seconds
+2026-11-05T13:30:00+03:00,MW-RYD-0421-0388,GE0/2/1,61,70,0,0
+2026-11-05T13:45:00+03:00,MW-RYD-0421-0388,GE0/2/1,0,0,124,776
+2026-11-05T14:00:00+03:00,MW-RYD-0421-0388,GE0/2/1,0,0,0,900
+2026-11-05T14:00:00+03:00,FO-RYD-0388-CORE1,10GE1/0/1,44,51,0,0
+` }
+},
+
+"Autonomous ops / analytics": {
+ API: { method: "GET", path: "/tmf-api/serviceProblemManagement/v5/serviceProblem/SP-2201", src: "TMF656 view of the analytics platform's root-cause result",
+  body: { id: "SP-2201", "@type": "ServiceProblem", name: "Cell outage after microwave link failure", status: "resolved", priority: 2,
+   rootCauseResource: [{ id: "MW-RYD-0421-0388", "@referredType": "Resource" }],
+   affectedResource: [{ id: "RYD-0421-L18-1" }, { id: "RYD-0421-L18-2" }],
+   impactPatterns: { impactedSubscribers: 4120, durationMin: 87 },
+   originatingSystem: "MAOS", timeRaised: "2026-11-05T13:44:10+03:00", timeResolved: "2026-11-05T15:10:00+03:00" } },
+ Stream: { topic: "analytics.insights", proto: "Kafka · JSON",
+  events: [
+   { ts: "2026-11-05T13:44:10.000+03:00", key: "SP-2201", v: { type: "ROOT_CAUSE", cause: "MW link down", confidence: 0.93 } },
+   { ts: "2026-11-05T13:46:00.000+03:00", key: "RYD-0421-L18-2", v: { type: "SON_ACTION", action: "increase power +2dB", reason: "coverage gap" } },
+   { ts: "2026-11-05T09:00:00.000+03:00", key: "RYD-0421-L18-1", v: { type: "ANOMALY", kpi: "dl_thp_mbps", baseline: 27.9, current: 9.4 } } ] }
+},
+
+"Probes / CEM / QoE": {
+ Stream: { topic: "probe.xdr.session", proto: "Kafka · JSON (one record per session)",
+  events: [
+   { ts: "2026-11-05T14:02:11.300+03:00", key: "001011234567890", v: { app: "YouTube", ecgi: "001-01-104210-2", dlMB: 84.2, thpMbps: 3.1, rttMs: 92, stalls: 4 } },
+   { ts: "2026-11-05T14:06:40.020+03:00", key: "001011234567890", v: { app: "WhatsApp", ecgi: "001-01-104210-2", dlMB: 1.4, thpMbps: 2.2, rttMs: 101, stalls: 0 } },
+   { ts: "2026-11-05T14:07:15.775+03:00", key: "001017654321000", v: { app: "Snapchat", ecgi: "001-01-104388-2", dlMB: 22.0, thpMbps: 28.4, rttMs: 31, stalls: 0 } } ] },
+ File: { name: "XDR_HTTP_20261105_1400_001.csv", note: "15-minute xDR batch from the probe platform",
+  content:
+`start_time,imsi,msisdn,ecgi,app,dl_bytes,ul_bytes,dl_thp_mbps,rtt_ms,video_stalls
+2026-11-05T14:02:11+03:00,001011234567890,966591234567,001-01-104210-2,YouTube,88290099,1820455,3.1,92,4
+2026-11-05T14:06:40+03:00,001011234567890,966591234567,001-01-104210-2,WhatsApp,1468004,388112,2.2,101,0
+2026-11-05T14:07:15+03:00,001017654321000,966597654321,001-01-104388-2,Snapchat,23068672,4110222,28.4,31,0
+` },
+ Table: { name: "CEM.SUBSCRIBER_QOE_DAILY", src: "QoE aggregate table",
+  cols: ["DATE","IMSI","HOME_CELL","QOE_SCORE","DL_THP_MBPS","RTT_MS","VIDEO_STALLS","TOP_APP"],
+  rows: [
+   ["2026-11-04","001011234567890","RYD-0421-L18-1","58.1","4.0","88","21","YouTube"],
+   ["2026-10-26","001011234567890","RYD-0421-L18-1","76.3","18.6","41","2","YouTube"],
+   ["2026-11-04","001017654321000","JED-0388-L21-2","81.4","26.9","33","1","Snapchat"] ] }
+},
+
+"Service orchestration & activation": {
+ API: { method: "GET", path: "/tmf-api/serviceOrdering/v5/serviceOrder/SO-77120", src: "TMF641 endpoint",
+  body: { id: "SO-77120", "@type": "ServiceOrder", state: "completed", orderDate: "2026-11-02T18:41:30+03:00",
+   relatedProductOrder: { id: "PORD-88412" },
+   serviceOrderItem: [{ id: "1", action: "modify", state: "completed",
+    service: { id: "SVC-DATA-001011234567890", serviceSpecification: { name: "Mobile data RFS" },
+     serviceCharacteristic: [{ name: "qosProfile", value: "POST299" }, { name: "monthlyQuotaGB", value: 25 }] } }] } },
+ Table: { name: "SOM.ACTIVATION_TASK", src: "Activation task log (OSM / Dynamic Activation)",
+  cols: ["TASK_ID","ORDER_ID","NETWORK_ELEMENT","COMMAND","RESULT","DURATION_MS","COMPLETED_AT"],
+  rows: [
+   ["T-551201","SO-77120","UDM01","MOD_SUB_PROFILE","OK","212","2026-11-02 18:42:01"],
+   ["T-551202","SO-77120","PCF01","UPDATE_POLICY_PROFILE","OK","148","2026-11-02 18:42:02"],
+   ["T-551203","SO-77120","CBS","CHANGE_MAIN_OFFER","OK","1,920","2026-11-02 18:43:50"] ] },
+ Stream: { topic: "som.serviceorder.events", proto: "Kafka · JSON (TMF688 envelope)",
+  events: [
+   { ts: "2026-11-02T18:41:30.100+03:00", key: "SO-77120", v: { eventType: "ServiceOrderCreateEvent", state: "acknowledged" } },
+   { ts: "2026-11-02T18:42:02.420+03:00", key: "SO-77120", v: { eventType: "ServiceOrderStateChangeEvent", state: "inProgress", tasksDone: 2 } },
+   { ts: "2026-11-02T18:43:50.880+03:00", key: "SO-77120", v: { eventType: "ServiceOrderStateChangeEvent", state: "completed" } } ] }
+},
+
+"Trouble tickets (network)": {
+ Table: { name: "HPD:Help Desk (incident form)", src: "Remedy ITSM table",
+  cols: ["INCIDENT_NUMBER","SUMMARY","PRIORITY","STATUS","CI","REPORTED_DATE","RESOLVED_DATE","MTTR_H"],
+  rows: [
+   ["INC000012345","RYD-0421 site down, MW link","High","Resolved","ENB104210","2026-11-05 13:45","2026-11-05 15:12","1.5"],
+   ["INC000012351","High drop rate RYD-0421-L18-1","Medium","In Progress","RYD-0421-L18-1","2026-11-01 08:30","—","—"],
+   ["INC000012360","Fibre cut JED ring B","Critical","Resolved","FO-JED-RING-B","2026-11-03 22:10","2026-11-04 04:55","6.8"] ] },
+ API: { method: "GET", path: "/api/arsys/v1/entry/HPD:Help Desk?q='Incident Number'=\"INC000012345\"", src: "Remedy REST (AUTIN / ServiceNow expose similar)",
+  body: { "Incident Number": "INC000012345", Summary: "RYD-0421 site down, MW link", Priority: "High", Status: "Resolved",
+   "Service Type": "Infrastructure Event", CI: "ENB104210", "Reported Date": "2026-11-05T13:45:12+03:00", "Last Resolved Date": "2026-11-05T15:12:40+03:00",
+   "Resolution": "Microwave ODU replaced at RYD-0388", "Assigned Group": "Transport Field Ops – Riyadh" } }
+},
+
+"Change / planned work": {
+ Table: { name: "change_request", src: "ServiceNow / Remedy Change table",
+  cols: ["NUMBER","SHORT_DESCRIPTION","TYPE","AFFECTED_CI","PLANNED_START","PLANNED_END","STATE"],
+  rows: [
+   ["CHG0034512","Antenna tilt optimisation RYD cluster 4","Normal","ENB104210","2026-10-27 01:00","2026-10-27 03:00","Closed"],
+   ["CHG0034588","Core router software upgrade","Normal","CORE-RTR-RYD-01","2026-11-08 01:00","2026-11-08 04:00","Scheduled"],
+   ["CHG0034590","Power maintenance JED-0388","Standard","ENB104388","2026-11-06 02:00","2026-11-06 05:00","Scheduled"] ] },
+ API: { method: "GET", path: "/api/now/table/change_request?number=CHG0034512", src: "ServiceNow Table API",
+  body: { number: "CHG0034512", short_description: "Antenna tilt optimisation RYD cluster 4", type: "normal", state: "closed",
+   cmdb_ci: "ENB104210", start_date: "2026-10-27 01:00:00", end_date: "2026-10-27 03:00:00",
+   close_code: "successful", risk: "moderate", assignment_group: "RAN Optimisation" } }
+},
+
+"Planning / cell inventory": {
+ File: { name: "cell_inventory_RYD_20261105.csv", note: "Planning tool export",
+  content:
+`site_id,cell_id,technology,band,lat,lon,azimuth_deg,mech_tilt_deg,elec_tilt_deg,height_m,status
+RYD-0421,RYD-0421-L18-1,LTE,1800,24.71362,46.67531,30,2,4,32,on-air
+RYD-0421,RYD-0421-L18-2,LTE,1800,24.71362,46.67531,150,2,3,32,on-air
+RYD-0421,RYD-0421-N35-1,NR,3500,24.71362,46.67531,30,0,6,32,on-air
+JED-0388,JED-0388-L21-2,LTE,2100,21.54326,39.17280,210,1,3,28,on-air
+` },
+ Table: { name: "INV.CELL", src: "Inventory schema (UIM / Amdocs / Adaptive Inventory)",
+  cols: ["CELL_ID","SITE_ID","TECHNOLOGY","BAND","AZIMUTH","ELEC_TILT","STATUS","LAST_UPDATED"],
+  rows: [
+   ["RYD-0421-L18-1","RYD-0421","LTE","1800","30","4","in-service","2026-10-27"],
+   ["RYD-0421-L18-2","RYD-0421","LTE","1800","150","3","in-service","2026-05-11"],
+   ["RYD-0421-N35-1","RYD-0421","NR","3500","30","6","in-service","2026-02-02"] ] },
+ API: { method: "GET", path: "/tmf-api/resourceInventoryManagement/v5/resource/RYD-0421-L18-1", src: "TMF639 endpoint",
+  body: { id: "RYD-0421-L18-1", "@type": "LogicalResource", name: "RYD-0421 LTE1800 sector 1", resourceStatus: "available", operationalState: "disable",
+   resourceSpecification: { name: "EUtranCellFDD" },
+   resourceCharacteristic: [{ name: "band", value: "1800" }, { name: "azimuth", value: 30 }, { name: "electricalTilt", value: 4 }],
+   place: [{ id: "RYD-0421", "@referredType": "GeographicSite" }] } }
+},
+
+/* ============================ NSS / core ============================ */
+
+"HLR / HSS / UDM / UDR": {
+ API: { method: "GET", path: "/provisioning/v1/subscribers/imsi-001011234567890", src: "Subscriber provisioning REST (Dynamic Activation / UDM provisioning)",
+  body: { imsi: "001011234567890", msisdn: "966591234567", status: "active", barring: { outgoing: false, international: false, roamingData: false },
+   roamingAllowed: true, accessRestriction: { nr: false, eutran: false },
+   apn: [{ name: "internet.nimbus", qci: 9, ambrDlMbps: 300 }, { name: "ims", qci: 5 }],
+   volteEnabled: true, lastUpdated: "2026-11-02T18:42:01+03:00" } },
+ File: { name: "UDM_SUBSCRIBER_DUMP_20261105.csv", note: "Daily subscriber profile dump",
+  content:
+`imsi,msisdn,status,roaming_allowed,data_barred,volte_enabled,nr_allowed,default_apn,last_updated
+001011234567890,966591234567,active,true,false,true,true,internet.nimbus,2026-11-02T18:42:01+03:00
+001017654321000,966597654321,active,false,false,true,true,internet.nimbus,2026-10-12T07:15:44+03:00
+001013344556677,966593344556,active,true,true,true,true,internet.nimbus,2026-11-03T08:12:40+03:00
+` }
+},
+
+"MSC / MSS (2G / 3G voice)": {
+ File: { name: "MSC01_20261105140000_00451.dat", saveAs: "MSC01_20261105140000_00451.decoded.txt", note: "ASN.1 BER binary (TS 32.298); shown and downloadable as a decoded dump",
+  content:
+`-- File: MSC01_20261105140000_00451.dat  (BER, 3GPP TS 32.298)  record 1 of 1,204
+moCallRecord {
+  servedIMSI            001011234567890
+  servedMSISDN          966591234567
+  calledNumber          96611xxxxxxx
+  location              { locationAreaCode 3311, cellIdentifier 28401 }
+  seizureTime           2026-11-05 14:03:40 +0300
+  answerTime            2026-11-05 14:03:47 +0300
+  releaseTime           2026-11-05 14:06:51 +0300
+  callDuration          184
+  causeForTerm          abnormalRelease
+  diagnostics           radioLinkFailure
+  mscIdentification     966500001001
+  recordSequenceNumber  451
+}
+` }
+},
+
+"Packet gateway (SGW / PGW / SMF / UPF)": {
+ File: { name: "PGW01_20261105_1415_00872.dat", saveAs: "PGW01_20261105_1415_00872.decoded.txt", note: "ASN.1 BER PGW-CDR file; shown and downloadable as a decoded dump",
+  content:
+`-- File: PGW01_20261105_1415_00872.dat  (BER, 3GPP TS 32.298)  record 1 of 18,330
+pGWRecord {
+  servedIMSI               001011234567890
+  servedMSISDN             966591234567
+  accessPointNameNI        internet.nimbus
+  rATType                  6 (EUTRAN)
+  userLocationInformation  TAI 001-01-4210 / ECGI 001-01-104210-1
+  recordOpeningTime        2026-11-05 14:00:12 +0300
+  duration                 900
+  causeForRecClosing       timeLimit
+  listOfServiceData {
+    { ratingGroup 100, datavolumeFBCUplink 8123456, datavolumeFBCDownlink 180112334 }
+    { ratingGroup 200, datavolumeFBCUplink 1204331, datavolumeFBCDownlink 61440220 }
+  }
+}
+` },
+ Stream: { topic: "Nchf_ConvergedCharging (SMF → CHF)", proto: "HTTP/2 · JSON",
+  events: [
+   { ts: "2026-11-05T14:00:12.031+03:00", key: "imsi-001011234567890", v: { op: "create", ratingGroup: 100, requestedUnit: { totalVolume: 10485760 } } },
+   { ts: "2026-11-05T14:05:12.448+03:00", key: "imsi-001011234567890", v: { op: "update", usedUnit: { downlinkVolume: 60122334, uplinkVolume: 2711220 }, trigger: "QUOTA_THRESHOLD" } },
+   { ts: "2026-11-05T14:15:12.902+03:00", key: "imsi-001011234567890", v: { op: "update", usedUnit: { downlinkVolume: 119990000, uplinkVolume: 5412236 }, trigger: "VALIDITY_TIME" } } ] }
+},
+
+"MME / AMF (mobility)": {
+ Stream: { topic: "EBM event stream (MME → event collector)", proto: "Binary event stream · shown decoded",
+  events: [
+   { ts: "2026-11-05T13:42:15.210+03:00", key: "001011234567890", v: { event: "L_SERVICE_REQUEST", result: "REJECT", cause: "eNB_NOT_AVAILABLE", ecgi: "001-01-104210-1" } },
+   { ts: "2026-11-05T13:42:18.004+03:00", key: "001011234567890", v: { event: "L_TAU", result: "SUCCESS", ecgi: "001-01-104211-1" } },
+   { ts: "2026-11-05T13:50:02.771+03:00", key: "001011234567890", v: { event: "L_ATTACH", result: "SUCCESS", ecgi: "001-01-104211-1", rat: "EUTRAN" } } ] },
+ File: { name: "EBM_MME01_20261105_1345.csv", note: "Decoded event batch, one per 15 minutes",
+  content:
+`event_time,imsi,event,result,cause,ecgi,tai
+2026-11-05T13:42:15+03:00,001011234567890,L_SERVICE_REQUEST,REJECT,eNB_NOT_AVAILABLE,001-01-104210-1,001-01-4210
+2026-11-05T13:42:18+03:00,001011234567890,L_TAU,SUCCESS,,001-01-104211-1,001-01-4211
+2026-11-05T13:43:01+03:00,001019988776655,L_ATTACH,REJECT,NETWORK_FAILURE,001-01-104210-2,001-01-4210
+2026-11-05T13:50:02+03:00,001011234567890,L_ATTACH,SUCCESS,,001-01-104211-1,001-01-4211
+` }
+},
+
+"PCRF / PCF (policy)": {
+ File: { name: "PCF_POLICY_EVENTS_20261105.csv", note: "Daily policy event log",
+  content:
+`event_time,msisdn,event,pcc_rule,quota_used_pct,action,qos_dl_kbps
+2026-11-05T09:12:44+03:00,966593344556,QUOTA_EXHAUSTED,FUP_999,100,THROTTLE,1024
+2026-11-05T14:31:03+03:00,966591234567,QUOTA_THRESHOLD,DATA_299,100,THROTTLE,1024
+2026-11-05T15:02:10+03:00,966597654321,ADDON_ACTIVATED,STREAMPLUS_ZERO_RATE,0,ZERO_RATE,
+` },
+ Stream: { topic: "Gx / N7 policy notifications → Kafka", proto: "Diameter RAR / HTTP/2 · shown as JSON",
+  events: [
+   { ts: "2026-11-05T14:31:03.120+03:00", key: "966591234567", v: { msg: "RAR", chargingRuleInstall: "THROTTLE_1M", reason: "quota exhausted" } },
+   { ts: "2026-11-05T14:31:03.188+03:00", key: "966591234567", v: { msg: "RAA", resultCode: 2001 } },
+   { ts: "2026-11-05T15:02:10.540+03:00", key: "966597654321", v: { msg: "SmPolicyUpdateNotify", pccRule: "STREAMPLUS_ZERO_RATE", action: "install" } } ] }
+},
+
+"IMS / VoLTE / VoWiFi": {
+ File: { name: "SCSCF01_20261105_1400_0033.dat", saveAs: "SCSCF01_20261105_1400_0033.decoded.txt", note: "ASN.1 BER IMS CDR file (Rf / CCF); shown and downloadable as a decoded dump",
+  content:
+`-- File: SCSCF01_20261105_1400_0033.dat  (BER, 3GPP TS 32.298)  record 1 of 6,410
+sCSCFRecord {
+  role-of-Node            originating
+  list-Of-Calling-Party   tel:+966591234567
+  called-Party-Address    tel:+96611xxxxxxx
+  sIP-Method              INVITE
+  serviceRequestTimeStamp 2026-11-05 14:20:02 +0300
+  serviceDeliveryEndTime  2026-11-05 14:20:58 +0300
+  causeForRecordClosing   unsuccessfulServiceDelivery
+  sIP-Response            503 Service Unavailable
+  accessNetworkInformation 3GPP-E-UTRAN-FDD; utran-cell-id-3gpp=0010141042101
+}
+` },
+ Stream: { topic: "ims.sip.failures", proto: "Kafka · JSON",
+  events: [
+   { ts: "2026-11-05T14:20:58.012+03:00", key: "966591234567", v: { method: "INVITE", response: 503, phase: "setup", cell: "RYD-0421-L18-2" } },
+   { ts: "2026-11-05T14:24:11.640+03:00", key: "966591234567", v: { method: "BYE", reason: "RTP timeout", phase: "in-call drop", cell: "RYD-0421-L18-2" } },
+   { ts: "2026-11-05T14:30:44.100+03:00", key: "966597654321", v: { method: "INVITE", response: 408, phase: "setup", access: "VoWiFi" } } ] }
+},
+
+"Signalling routing (DRA / SCP / SEPP)": {
+ Stream: { topic: "dsr.xdr", proto: "Kafka · JSON",
+  events: [
+   { ts: "2026-11-05T11:02:07.330+03:00", key: "001011234567890", v: { interface: "S6a", command: "ULR", peer: "MME.partner-a.example", result: 2001 } },
+   { ts: "2026-11-05T11:02:09.881+03:00", key: "001011234567890", v: { interface: "S6a", command: "ULR", peer: "MME.partner-b.example", result: 5420, meaning: "UNKNOWN_EPS_SUBSCRIPTION" } },
+   { ts: "2026-11-05T11:05:40.002+03:00", key: "001017654321000", v: { interface: "N32", service: "nudm-sdm", peer: "sepp.partner.example", httpStatus: 200 } } ] },
+ File: { name: "DSR_XDR_20261105_11.csv", note: "Hourly signalling xDR export",
+  content:
+`time,imsi,interface,command,origin_host,destination_realm,result_code,latency_ms
+2026-11-05T11:02:07+03:00,001011234567890,S6a,ULR,mme01.partner-a.example,epc.mnc001.mcc001.3gppnetwork.org,2001,38
+2026-11-05T11:02:09+03:00,001011234567890,S6a,ULR,mme02.partner-b.example,epc.mnc001.mcc001.3gppnetwork.org,5420,41
+2026-11-05T11:03:12+03:00,001019988776655,Gy,CCR-U,pgw01.nimbus.example,ocs.nimbus.example,2001,12
+` }
+},
+
+"SMSC / USSD": {
+ File: { name: "USSD_GW_SESSIONS_20261105.csv", note: "Daily USSD gateway log",
+  content:
+`session_start,msisdn,short_code,menu_path,result,duration_s
+2026-11-05T08:11:02+03:00,966597654321,*142#,balance,OK,6
+2026-11-05T08:11:40+03:00,966597654321,*142#,balance>bundles>data_7d,OK,21
+2026-11-05T12:30:15+03:00,966591234567,*141#,data_balance,OK,5
+2026-11-05T14:32:01+03:00,966591234567,*141#,data_balance,OK,4
+` }
+},
+
+"EIR": {
+ Table: { name: "EIR.IMEI_REGISTRY", src: "EIR database",
+  cols: ["IMEI_TAC","IMSI","DEVICE_MODEL","5G_CAPABLE","FIRST_SEEN","LIST"],
+  rows: [
+   ["35391110","001011234567890","Apple iPhone 15","true","2024-08-14","white"],
+   ["86844205","001017654321000","Samsung Galaxy A15","false","2026-03-02","white"],
+   ["35628510","001013344556677","Google Pixel 8","true","2026-11-01","white"] ] },
+ File: { name: "IMEI_CHANGES_20261105.csv", note: "Daily device-change file",
+  content:
+`event_time,imsi,old_tac,new_tac,new_model,operator_device
+2026-11-01T19:20:44+03:00,001013344556677,35391110,35628510,Google Pixel 8,false
+2026-11-04T10:05:31+03:00,001019988776655,86844205,35210511,Apple iPhone 16,true
+` }
+},
+
+"NWDAF (5G analytics)": {
+ API: { method: "GET", path: "/nnwdaf-analyticsinfo/v1/analytics?event-id=QOS_SUSTAINABILITY&tgt-ue=...&ana-filter=tai:001-01-4210", src: "3GPP Nnwdaf_AnalyticsInfo",
+  body: { qosSustainInfos: [{ locationInfo: "TAI 001-01-4210", snssai: "SST 1", fiveQi: 9, qosFlowRetainThreshold: 0.95,
+   ranUeThrouThreshold: "10 Mbps", confidence: 82, startTs: "2026-11-05T16:00:00+03:00", endTs: "2026-11-05T18:00:00+03:00", prediction: "degradation likely" }] } },
+ Stream: { topic: "Nnwdaf_EventsSubscription notifications", proto: "HTTP/2 callback · JSON",
+  events: [
+   { ts: "2026-11-05T13:45:00.000+03:00", key: "sub-77", v: { event: "NF_LOAD", nf: "UPF02", loadPct: 81 } },
+   { ts: "2026-11-05T14:00:00.000+03:00", key: "sub-78", v: { event: "ABNORMAL_BEHAVIOUR", exception: "UNEXPECTED_UE_LOCATION", ratio: 0.03 } },
+   { ts: "2026-11-05T14:15:00.000+03:00", key: "sub-79", v: { event: "QOS_SUSTAINABILITY", tai: "001-01-4210", prediction: "degradation likely" } } ] }
+},
+
+"Roaming (TAP / RAP)": {
+ File: { name: "CDZZZNBZZZPA01234", saveAs: "CDZZZNBZZZPA01234.decoded.txt", note: "TAP3 ASN.1 file from the clearing house; shown and downloadable as a decoded dump",
+  content:
+`-- TAP3.12 TransferBatch  sender ZZZPA  recipient ZZZNB  sequence 01234
+batchControlInfo { fileCreationTimeStamp 20261105020000+0400, tapDecimalPlaces 6, localCurrency AED }
+callEventDetails {
+  gprsCall {
+    imsi                 001011234567890
+    callEventStartTimeStamp 20261104183012+0400
+    dataVolumeIncoming   399112334
+    dataVolumeOutgoing   20044211
+    apn                  internet.nimbus
+    charge               0.000000 (bundle)
+  }
+}
+auditControlInfo { totalCharge 0, callEventDetailsCount 1 }
+` }
+}
+};

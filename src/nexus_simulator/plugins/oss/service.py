@@ -8,7 +8,7 @@ from typing import Any, Dict
 from loguru import logger
 
 from nexus_simulator.base.simulator import BaseSimulator as BaseSimulatorService
-from nexus_simulator.plugins.oss.tables import build_oss_tables
+from nexus_simulator.plugins.telco_backbone_mixin import TelcoBackboneMixin
 from nexus_simulator.plugins.telco_seed_pools import get_telco_pools
 
 sim_logger = logger.bind(component="oss-simulator")
@@ -17,8 +17,11 @@ SCHEMA = "oss_network"
 SERVER = "oss_simulator"
 
 
-class OSSSimulatorService(BaseSimulatorService):
+class OSSSimulatorService(TelcoBackboneMixin, BaseSimulatorService):
     SERVICE_NAME = "oss"
+    backbone_layer = "OSS"
+    SERVER_NAME = SERVER
+    LEGACY_SCHEMA = SCHEMA
     PRIORITY_TABLES = [
         "Cell_Site",
         "Network_Alarm",
@@ -40,5 +43,4 @@ class OSSSimulatorService(BaseSimulatorService):
             "Seeding OSS simulator cells={}",
             len(pools.cell_ids),
         )
-        data_map = build_oss_tables(pools)
-        return await self._finalize_seed(SCHEMA, SERVER, data_map)
+        return await self.generate_backbone(pools=pools, include_legacy_tables=True)

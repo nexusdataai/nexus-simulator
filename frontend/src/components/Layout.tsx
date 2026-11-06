@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
+import { SIMULATOR_DOMAINS, getDomainForTab, resolveTabFromRouteParam } from '@/config/simulatorDomains';
 import Sidebar from './Sidebar';
 import UserMenu from './UserMenu';
 import { Search, Bell, RefreshCw, Sun, Moon } from 'lucide-react';
@@ -15,13 +16,27 @@ const TITLES: Record<string, string> = {
   '/settings': 'Settings',
 };
 
+function titleForSimulatorsPath(pathname: string): string | undefined {
+  const m = pathname.match(/^\/simulators\/([^/]+)\/?$/);
+  if (!m) return undefined;
+  const tab = resolveTabFromRouteParam(m[1]);
+  if (!tab) return 'Simulators';
+  const domId = getDomainForTab(tab);
+  const domain = domId ? SIMULATOR_DOMAINS.find((d) => d.id === domId) : undefined;
+  return domain ? `Simulators · ${domain.title}` : 'Simulators';
+}
+
 interface LayoutProps { children: React.ReactNode; }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const loc = useLocation();
   const { theme, toggleTheme } = useTheme();
 
-  const title = TITLES[loc.pathname] || Object.entries(TITLES).find(([k]) => k !== '/' && loc.pathname.startsWith(k))?.[1] || 'Nexus Simulator';
+  const title =
+    titleForSimulatorsPath(loc.pathname) ||
+    TITLES[loc.pathname] ||
+    Object.entries(TITLES).find(([k]) => k !== '/' && loc.pathname.startsWith(k))?.[1] ||
+    'Nexus Simulator';
 
   return (
     <RefreshProvider>

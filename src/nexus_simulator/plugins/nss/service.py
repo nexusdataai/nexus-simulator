@@ -8,7 +8,7 @@ from typing import Any, Dict
 from loguru import logger
 
 from nexus_simulator.base.simulator import BaseSimulator as BaseSimulatorService
-from nexus_simulator.plugins.nss.tables import build_nss_tables
+from nexus_simulator.plugins.telco_backbone_mixin import TelcoBackboneMixin
 from nexus_simulator.plugins.telco_seed_pools import get_telco_pools
 
 sim_logger = logger.bind(component="nss-simulator")
@@ -17,8 +17,11 @@ SCHEMA = "nss_core"
 SERVER = "nss_simulator"
 
 
-class NSSSimulatorService(BaseSimulatorService):
+class NSSSimulatorService(TelcoBackboneMixin, BaseSimulatorService):
     SERVICE_NAME = "nss"
+    backbone_layer = "NSS"
+    SERVER_NAME = SERVER
+    LEGACY_SCHEMA = SCHEMA
     PRIORITY_TABLES = [
         "Usage_Daily_Agg",
         "Subscriber_QoE_Daily",
@@ -41,5 +44,4 @@ class NSSSimulatorService(BaseSimulatorService):
             len(pools.customer_ids),
             pools.history_days,
         )
-        data_map = build_nss_tables(pools)
-        return await self._finalize_seed(SCHEMA, SERVER, data_map)
+        return await self.generate_backbone(pools=pools, include_legacy_tables=True)

@@ -46,6 +46,7 @@ def _build_simulator_config():
         SimulatorConfig,
         TPMPluginConfig,
         TelcoGoldenPluginConfig,
+        TelcoSourcesPluginConfig,
         WXCCPluginConfig,
     )
 
@@ -135,11 +136,20 @@ def _build_simulator_config():
         )
 
     def _telco_golden():
-        if os.environ.get("TELCO_GOLDEN_SIMULATOR_ENABLED", "true").lower() == "false":
+        # Off by default; backbone data lives in BSS/NSS/OSS only.
+        if os.environ.get("TELCO_GOLDEN_SIMULATOR_ENABLED", "false").lower() != "true":
             return None
         return TelcoGoldenPluginConfig(
             bucket=os.environ.get("TELCO_GOLDEN_SIMULATOR_BUCKET", ""),
             prefix=os.environ.get("TELCO_GOLDEN_SIMULATOR_PREFIX", "telco-golden-simulator"),
+        )
+
+    def _telco_sources():
+        if os.environ.get("TELCO_SOURCES_SIMULATOR_ENABLED", "false").lower() != "true":
+            return None
+        return TelcoSourcesPluginConfig(
+            bucket=os.environ.get("TELCO_SOURCES_BUCKET", os.environ.get("TELCO_SOURCES_SIMULATOR_BUCKET", "")),
+            prefix=os.environ.get("TELCO_SOURCES_PREFIX", os.environ.get("TELCO_SOURCES_SIMULATOR_PREFIX", "telco-sources")),
         )
 
     return SimulatorConfig(
@@ -157,6 +167,7 @@ def _build_simulator_config():
         nss=_nss(),
         oss=_oss(),
         telco_golden=_telco_golden(),
+        telco_sources=_telco_sources(),
     )
 
 

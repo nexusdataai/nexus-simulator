@@ -1,0 +1,375 @@
+{
+  "version": 1,
+  "source": "data/Telco-Data/samples.js",
+  "vendors": {
+    "H": "Huawei",
+    "N": "Nokia",
+    "E": "Ericsson",
+    "A": "Amdocs",
+    "S": "Salesforce",
+    "O": "Oracle",
+    "X": "Others"
+  },
+  "vendor_defaults": {
+    "bss": "H",
+    "oss": "E",
+    "nss": "H"
+  },
+  "systems": [
+    {
+      "system_key": "CRM / customer master",
+      "slug": "crm_customer_master",
+      "layer": "BSS",
+      "deliveries": [
+        "Table",
+        "File",
+        "API"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "Product catalog",
+      "slug": "product_catalog",
+      "layer": "BSS",
+      "deliveries": [
+        "Table",
+        "File",
+        "API"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "Order management",
+      "slug": "order_management",
+      "layer": "BSS",
+      "deliveries": [
+        "Table",
+        "API",
+        "Stream"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Subscriptions / installed base",
+      "slug": "subscriptions_installed_base",
+      "layer": "BSS",
+      "deliveries": [
+        "Table",
+        "API"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "Online charging (OCS / CCS / CHF)",
+      "slug": "online_charging_ocs_ccs_chf",
+      "layer": "BSS",
+      "deliveries": [
+        "File",
+        "API",
+        "Stream"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "Mediation",
+      "slug": "mediation",
+      "layer": "BSS",
+      "deliveries": [
+        "File",
+        "Stream"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "Billing / invoicing",
+      "slug": "billing_invoicing",
+      "layer": "BSS",
+      "deliveries": [
+        "Table",
+        "File"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Payments and collections",
+      "slug": "payments_and_collections",
+      "layer": "BSS",
+      "deliveries": [
+        "Table",
+        "API"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Customer care / complaints",
+      "slug": "customer_care_complaints",
+      "layer": "BSS",
+      "deliveries": [
+        "Table",
+        "API"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "Campaign / offers",
+      "slug": "campaign_offers",
+      "layer": "BSS",
+      "deliveries": [
+        "Table",
+        "File"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Customer data platform / event hub",
+      "slug": "customer_data_platform_event_hub",
+      "layer": "BSS",
+      "deliveries": [
+        "Table",
+        "File",
+        "Stream"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "MNP / port-out",
+      "slug": "mnp_port_out",
+      "layer": "BSS",
+      "deliveries": [
+        "File",
+        "API"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Digital (app / web)",
+      "slug": "digital_app_web",
+      "layer": "BSS",
+      "deliveries": [
+        "File",
+        "Stream"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Element manager: Fault (FM)",
+      "slug": "element_manager_fault_fm",
+      "layer": "OSS",
+      "deliveries": [
+        "API",
+        "Stream"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "Element manager: Performance (PM)",
+      "slug": "element_manager_performance_pm",
+      "layer": "OSS",
+      "deliveries": [
+        "File"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "Element manager: Configuration (CM)",
+      "slug": "element_manager_configuration_cm",
+      "layer": "OSS",
+      "deliveries": [
+        "File",
+        "API"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "PM / statistics warehouse",
+      "slug": "pm_statistics_warehouse",
+      "layer": "OSS",
+      "deliveries": [
+        "Table",
+        "File"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "Transport / IP NMS",
+      "slug": "transport_ip_nms",
+      "layer": "OSS",
+      "deliveries": [
+        "File",
+        "API",
+        "Stream"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Autonomous ops / analytics",
+      "slug": "autonomous_ops_analytics",
+      "layer": "OSS",
+      "deliveries": [
+        "API",
+        "Stream"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Probes / CEM / QoE",
+      "slug": "probes_cem_qoe",
+      "layer": "OSS",
+      "deliveries": [
+        "Table",
+        "File",
+        "Stream"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Service orchestration & activation",
+      "slug": "service_orchestration_activation",
+      "layer": "OSS",
+      "deliveries": [
+        "Table",
+        "API",
+        "Stream"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Trouble tickets (network)",
+      "slug": "trouble_tickets_network",
+      "layer": "OSS",
+      "deliveries": [
+        "Table",
+        "API"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "Change / planned work",
+      "slug": "change_planned_work",
+      "layer": "OSS",
+      "deliveries": [
+        "Table",
+        "API"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Planning / cell inventory",
+      "slug": "planning_cell_inventory",
+      "layer": "OSS",
+      "deliveries": [
+        "Table",
+        "File",
+        "API"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "HLR / HSS / UDM / UDR",
+      "slug": "hlr_hss_udm_udr",
+      "layer": "NSS",
+      "deliveries": [
+        "File",
+        "API"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "MSC / MSS (2G / 3G voice)",
+      "slug": "msc_mss_2g_3g_voice",
+      "layer": "NSS",
+      "deliveries": [
+        "File"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Packet gateway (SGW / PGW / SMF / UPF)",
+      "slug": "packet_gateway_sgw_pgw_smf_upf",
+      "layer": "NSS",
+      "deliveries": [
+        "File",
+        "Stream"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "MME / AMF (mobility)",
+      "slug": "mme_amf_mobility",
+      "layer": "NSS",
+      "deliveries": [
+        "File",
+        "Stream"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "PCRF / PCF (policy)",
+      "slug": "pcrf_pcf_policy",
+      "layer": "NSS",
+      "deliveries": [
+        "File",
+        "Stream"
+      ],
+      "phase_a": true
+    },
+    {
+      "system_key": "IMS / VoLTE / VoWiFi",
+      "slug": "ims_volte_vowifi",
+      "layer": "NSS",
+      "deliveries": [
+        "File",
+        "Stream"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Signalling routing (DRA / SCP / SEPP)",
+      "slug": "signalling_routing_dra_scp_sepp",
+      "layer": "NSS",
+      "deliveries": [
+        "File",
+        "Stream"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "SMSC / USSD",
+      "slug": "smsc_ussd",
+      "layer": "NSS",
+      "deliveries": [
+        "File"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "EIR",
+      "slug": "eir",
+      "layer": "NSS",
+      "deliveries": [
+        "Table",
+        "File"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "NWDAF (5G analytics)",
+      "slug": "nwdaf_5g_analytics",
+      "layer": "NSS",
+      "deliveries": [
+        "API",
+        "Stream"
+      ],
+      "phase_a": false
+    },
+    {
+      "system_key": "Roaming (TAP / RAP)",
+      "slug": "roaming_tap_rap",
+      "layer": "NSS",
+      "deliveries": [
+        "File"
+      ],
+      "phase_a": false
+    }
+  ]
+}

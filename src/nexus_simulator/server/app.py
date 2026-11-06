@@ -5,8 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .. import __version__
 from . import connector_runtime
@@ -23,6 +26,9 @@ from .routers import sfdc as sfdc_router
 from .routers import sourcing as sourcing_router
 from .routers import telco as telco_router
 from .routers import telco_golden as telco_golden_router
+from .routers import telco_sources as telco_sources_router
+from .routers import telco_sources_admin as telco_sources_admin_router
+from .routers import tmf_telco as tmf_telco_router
 from .routers import tpm as tpm_router
 from .routers import wxcc as wxcc_router
 from .routers.connectors import external_connector_api
@@ -48,6 +54,7 @@ BSS_PREFIX = "/api/v1/bss-simulator"
 NSS_PREFIX = "/api/v1/nss-simulator"
 OSS_PREFIX = "/api/v1/oss-simulator"
 TELCO_GOLDEN_PREFIX = "/api/v1/telco-golden-simulator"
+TELCO_SOURCES_PREFIX = "/api/v1/telco-sources-simulator"
 
 
 def create_app(simulator: Any | None = None, *, cors_origins: list[str] | None = None) -> FastAPI:
@@ -86,8 +93,24 @@ def create_app(simulator: Any | None = None, *, cors_origins: list[str] | None =
     app.include_router(bss_router.router, prefix=BSS_PREFIX, tags=["BSS Simulator"])
     app.include_router(nss_router.router, prefix=NSS_PREFIX, tags=["NSS Simulator"])
     app.include_router(oss_router.router, prefix=OSS_PREFIX, tags=["OSS Simulator"])
-    app.include_router(telco_golden_router.router, prefix=TELCO_GOLDEN_PREFIX, tags=["Telco Golden Simulator"])
     app.include_router(telco_router.router)
+    # Optional legacy plugins (enable via TELCO_*_SIMULATOR_ENABLED=true in CLI config)
+    if simulator is not None and (
+        getattr(simulator, "telco_golden", None) is not None
+        or simulator.registry.get("telco_golden") is not None
+    ):
+        app.include_router(telco_golden_router.router, prefix=TELCO_GOLDEN_PREFIX, tags=["Telco Golden Simulator"])
+    if simulator is not None and (
+        getattr(simulator, "telco_sources", None) is not None
+        or simulator.registry.get("telco_sources") is not None
+    ):
+        app.include_router(telco_sources_router.router)
+        app.include_router(telco_sources_admin_router.router, prefix=TELCO_SOURCES_PREFIX, tags=["Telco Sources Simulator"])
+    app.include_router(tmf_telco_router.router)
+
+    _atlas_dir = Path(__file__).resolve().parents[3] / "data" / "Telco-Data"
+    if _atlas_dir.is_dir():
+        app.mount("/telco-atlas", StaticFiles(directory=str(_atlas_dir), html=True), name="telco-atlas")
     app.include_router(sfdc_connector_api.router)
     app.include_router(oracle_erp_connector_api.router)
     app.include_router(sap_connector_api.router)
@@ -103,7 +126,7 @@ def create_app(simulator: Any | None = None, *, cors_origins: list[str] | None =
         if simulator is None:
             return
         for name, svc in simulator.registry.all().items():
-            if name in ("simulator", "oracle_erp", "external_source", "bss", "nss", "oss", "telco_golden"):
+            if name in ("simulator", "oracle_erp", "external_source", "bss", "nss", "oss"):
                 continue
             try:
                 if hasattr(svc, "ensure_loaded"):
@@ -122,8 +145,12 @@ def create_app(simulator: Any | None = None, *, cors_origins: list[str] | None =
             except Exception:
                 logger.exception("simulator plugin hydrate failed: %s", name)
 
-        # Telco plugins hydrate in dependency order: BSS → NSS → OSS → golden.
-        for name in ("bss", "nss", "oss", "telco_golden"):
+        # Telco plugins: BSS → NSS → OSS, then optional legacy sources → golden when registered.
+        telco_order: list[str] = ["bss", "nss", "oss"]
+        for extra in ("telco_sources", "telco_golden"):
+            if simulator.registry.get(extra):
+                telco_order.append(extra)
+        for name in telco_order:
             svc = simulator.registry.get(name)
             if svc is None:
                 continue

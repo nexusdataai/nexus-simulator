@@ -13,6 +13,24 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+@register("telco.usage-decline", "source-outage")
+async def source_outage_scenario(registry, spec, step, ctx):
+    """Inject backbone-aligned stream events (legacy `telco_sources` or OSS/NSS streams)."""
+    svc = registry.get("telco_sources")
+    if svc is None or not hasattr(svc, "seed_scenario"):
+        svc = registry.get("oss") or registry.get("nss")
+    if svc is None or not hasattr(svc, "seed_scenario"):
+        return {"message": "no telco simulator with seed_scenario", "planned": {}, "rows": [], "bindings": {}}
+    result = await svc.seed_scenario("outage_backhaul")
+    plugin = getattr(svc, "SERVICE_NAME", "telco")
+    return {
+        "message": f"Injected outage_backhaul into {plugin} backbone streams",
+        "planned": {f"{plugin}_streams": 1},
+        "bindings": result,
+        "rows": [],
+    }
+
+
 @register("telco.usage-decline", "bind-decline")
 async def usage_bind(registry, spec, step, ctx):
     rows = await load_table(registry, "bss", "Subscriber_Profile")

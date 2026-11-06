@@ -193,19 +193,31 @@ Compact view for docs; full generator output lives under `examples/data/`.
 
 ## Implemented in nexus-simulator
 
-Four FDW plugins share `plugins/telco_seed_pools.py` and seed deterministically:
+The **default** telecom product surface is three FDW plugins: **BSS**, **NSS**, and **OSS**. They share `plugins/telco_seed_pools.py` for deterministic subscriber/cell identity and implement **Telco AI Backbone** generation: Table / File / API / Stream shapes aligned with [`data/Telco-Data/samples.js`](../data/Telco-Data/samples.js) (fixtures in [`src/nexus_simulator/data/telco/sample_fixtures.json`](../src/nexus_simulator/data/telco/sample_fixtures.json); regenerate with `node scripts/export_telco_samples_fixtures.js`).
 
-| Plugin | Schema | API prefix | Registry key |
-| --- | --- | --- | --- |
-| BSS | `bss_crm` | `/api/v1/bss-simulator` | `bss` |
-| NSS | `nss_core` | `/api/v1/nss-simulator` | `nss` |
-| OSS | `oss_network` | `/api/v1/oss-simulator` | `oss` |
-| Telco Golden | `telco_intelligence` | `/api/v1/telco-golden-simulator` | `telco_golden` |
+| Plugin | Legacy schema (normalized) | Atlas backbone schema | API prefix | Registry key |
+| --- | --- | --- | --- | --- |
+| BSS | `bss_crm` | `telco_atlas_bss` | `/api/v1/bss-simulator` | `bss` |
+| NSS | `nss_core` | `telco_atlas_nss` | `/api/v1/nss-simulator` | `nss` |
+| OSS | `oss_network` | `telco_atlas_oss` | `/api/v1/oss-simulator` | `oss` |
 
-**Ordered seed:** `POST /api/v1/telco/seed-all` runs BSS → NSS → OSS → golden. Golden rows are rolled up in `telco_golden/rollup.py` (not independent random).
+**Backbone APIs (per layer):** `GET /api/v1/{bss|nss|oss}-simulator/backbone/catalog`, `POST .../backbone/generate`, `GET .../backbone/artifacts`, `GET .../backbone/files`, `GET .../backbone/file?path=...`, SSE `GET .../backbone/stream/{topic}`. The reference atlas HTML is served at `/telco-atlas/`.
 
-**Env knobs:** `TELCO_SUBSCRIBERS` (default 500), `TELCO_CELLS` (100), `TELCO_HISTORY_DAYS` (60), `TELCO_SEED` (42). Plan-scale demo: `TELCO_SUBSCRIBERS=5000 TELCO_CELLS=500 TELCO_HISTORY_DAYS=90`. Disable with `BSS_SIMULATOR_ENABLED=false` (and NSS/OSS/TELCO_GOLDEN_* equivalents).
+**Ordered seed:** `POST /api/v1/telco/seed-all` runs **BSS → NSS → OSS** by default. Optional query params `include_golden=true` and/or `include_sources=true` add `telco_golden` and/or `telco_sources` when those plugins are enabled in config.
 
-**FDW:** `GET /api/fdw/tables?source=bss|nss|oss|telco_golden`
+**Env knobs:** `TELCO_SUBSCRIBERS` (default 500), `TELCO_CELLS` (100), `TELCO_HISTORY_DAYS` (60), `TELCO_SEED` (42). Plan-scale demo: `TELCO_SUBSCRIBERS=5000 TELCO_CELLS=500 TELCO_HISTORY_DAYS=90`. Disable layers with `BSS_SIMULATOR_ENABLED=false` (and NSS/OSS equivalents).
 
-**Scenarios:** `telco.usage-decline`, `telco.churn-portout`, `telco.upsell-ready`, `telco.policy-throttle` under `scenarios/catalog/telco-customer-intelligence.yaml`.
+**FDW:** `GET /api/fdw/tables?source=bss|nss|oss` (plus `telco_golden` or `telco_sources` when registered).
+
+**TMF index:** merged from backbone generation across the three layers; `GET /tmf-api/*` resolves stored bodies.
+
+**Scenarios:** `telco.usage-decline`, `telco.churn-portout`, `telco.upsell-ready`, `telco.policy-throttle` under `scenarios/catalog/telco-customer-intelligence.yaml`. The `source-outage` step calls `seed_scenario("outage_backhaul")` on **OSS** or **NSS** (or legacy `telco_sources` when present).
+
+### Optional legacy plugins
+
+| Plugin | When enabled | Notes |
+| --- | --- | --- |
+| **Telco Golden** | `TELCO_GOLDEN_SIMULATOR_ENABLED=true` (CLI) | `telco_intelligence` rollup in `telco_golden/rollup.py`; admin at `/api/v1/telco-golden-simulator`. |
+| **Telco Sources** | `TELCO_SOURCES_SIMULATOR_ENABLED=true` | Standalone `/api/v1/telco-sources/*` profile + generate; same pool-driven identity as backbone. |
+
+Atlas catalog for legacy sources: [`data/telco/atlas_catalog.json`](../data/telco/atlas_catalog.json) (regenerate via `scripts/export_telco_atlas.py`).

@@ -28,6 +28,8 @@ _SOURCE_ALIASES = {
     "oss": "oss",
     "telco_golden": "telco_golden",
     "telco-golden": "telco_golden",
+    "telco_sources": "telco_sources",
+    "telco-sources": "telco_sources",
 }
 
 

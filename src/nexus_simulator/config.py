@@ -120,6 +120,15 @@ class TelcoGoldenPluginConfig:
 
 
 @dataclass(frozen=True)
+class TelcoSourcesPluginConfig:
+    """Telecom BSS/OSS/NSS source artifact simulator settings."""
+
+    bucket: str = ""
+    prefix: str = "telco-sources"
+    enabled: bool = True
+
+
+@dataclass(frozen=True)
 class SimulatorConfig:
     """Runtime settings required to assemble the simulator.
 
@@ -143,5 +152,6 @@ class SimulatorConfig:
     nss: NSSPluginConfig | None = None
     oss: OSSPluginConfig | None = None
     telco_golden: TelcoGoldenPluginConfig | None = None
+    telco_sources: TelcoSourcesPluginConfig | None = None
 
     extras: dict = field(default_factory=dict)

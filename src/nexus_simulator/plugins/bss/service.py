@@ -8,7 +8,7 @@ from typing import Any, Dict
 from loguru import logger
 
 from nexus_simulator.base.simulator import BaseSimulator as BaseSimulatorService
-from nexus_simulator.plugins.bss.tables import build_bss_tables
+from nexus_simulator.plugins.telco_backbone_mixin import TelcoBackboneMixin
 from nexus_simulator.plugins.telco_seed_pools import get_telco_pools
 
 sim_logger = logger.bind(component="bss-simulator")
@@ -17,8 +17,11 @@ SCHEMA = "bss_crm"
 SERVER = "bss_simulator"
 
 
-class BSSSimulatorService(BaseSimulatorService):
+class BSSSimulatorService(TelcoBackboneMixin, BaseSimulatorService):
     SERVICE_NAME = "bss"
+    backbone_layer = "BSS"
+    SERVER_NAME = SERVER
+    LEGACY_SCHEMA = SCHEMA
     PRIORITY_TABLES = [
         "Subscriber_Profile",
         "Invoice",
@@ -42,5 +45,4 @@ class BSSSimulatorService(BaseSimulatorService):
             len(pools.customer_ids),
             pools.seed,
         )
-        data_map = build_bss_tables(pools)
-        return await self._finalize_seed(SCHEMA, SERVER, data_map)
+        return await self.generate_backbone(pools=pools, include_legacy_tables=True)
