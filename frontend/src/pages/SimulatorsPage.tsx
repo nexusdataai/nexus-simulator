@@ -7,7 +7,13 @@ import { SAPSimulatorPanel } from '@/components/sap-simulator';
 import { ExternalSimulatorPanel } from '@/components/external-simulator';
 import { CPQSimulatorPanel } from '@/components/cpq-simulator/CPQSimulatorPanel';
 import { TelcoBackbonePanel } from '@/components/telco-simulator/TelcoBackbonePanel';
-import { tpmSimulatorService, sourcingSimulatorService } from '@/services/cpqSimulatorService';
+import {
+  tpmSimulatorService,
+  sourcingSimulatorService,
+  bssSimulatorService,
+  nssSimulatorService,
+  ossSimulatorService,
+} from '@/services/cpqSimulatorService';
 import { cn } from '@/lib/utils';
 import {
   SIMULATOR_DOMAINS,
@@ -217,6 +223,7 @@ export default function SimulatorsPage() {
             <div id="sim-panel-bss" role="tabpanel" aria-labelledby="sim-tab-bss">
               <TelcoBackbonePanel
                 apiBase="/api/v1/bss-simulator"
+                simulatorService={bssSimulatorService}
                 simulatorTitle="BSS Simulator"
                 simulatorSubtitle="Business Support Systems — CRM, billing, care, campaigns, MNP"
               />
@@ -226,6 +233,7 @@ export default function SimulatorsPage() {
             <div id="sim-panel-nss" role="tabpanel" aria-labelledby="sim-tab-nss">
               <TelcoBackbonePanel
                 apiBase="/api/v1/nss-simulator"
+                simulatorService={nssSimulatorService}
                 simulatorTitle="NSS Simulator"
                 simulatorSubtitle="Network Switching Subsystem — usage aggregates, QoE, attach and VoLTE failures, policy throttle"
               />
@@ -235,6 +243,7 @@ export default function SimulatorsPage() {
             <div id="sim-panel-oss" role="tabpanel" aria-labelledby="sim-tab-oss">
               <TelcoBackbonePanel
                 apiBase="/api/v1/oss-simulator"
+                simulatorService={ossSimulatorService}
                 simulatorTitle="OSS Simulator"
                 simulatorSubtitle="Operations Support Systems — cell KPIs, alarms, maintenance, trouble tickets"
               />

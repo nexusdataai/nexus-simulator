@@ -123,6 +123,7 @@ def generate_layer_backbone(
     systems: Optional[Set[str]] = None,
     deliveries: Optional[Set[str]] = None,
     system_deliveries: Optional[Dict[str, Set[str]]] = None,
+    system_vendors: Optional[Dict[str, str]] = None,
     vendor_code: Optional[str] = None,
 ) -> dict[str, Any]:
     """Produce backbone_bundle for one layer (BSS, OSS, or NSS)."""
@@ -134,20 +135,25 @@ def generate_layer_backbone(
     if systems is not None:
         sys_map = {k: v for k, v in sys_map.items() if k in systems}
 
-    vid = (vendor_code or "").strip().upper()[:1] or None
-    vendor_label = atlas.vendors.get(vid, vendor_code) if vid else None
+    global_vid = (vendor_code or "").strip().upper()[:1] or None
+    sv_map = {k: str(v).strip().upper()[:1] for k, v in (system_vendors or {}).items() if v}
 
     cid_map = _build_c100_mapping(pools)
-    ctx: Dict[str, Any] = {
-        "cid_map": cid_map,
-        "vendor_code": vid,
-        "vendor_label": vendor_label or "",
-    }
 
     tables: Dict[str, List[dict]] = {}
+    table_sources: Dict[str, str] = {}
     files: List[dict] = []
     vendor_api_index: Dict[str, dict] = {}
     streams: Dict[str, List[dict]] = {}
+    stream_sources: Dict[str, str] = {}
+    per_system_vendor: Dict[str, str] = {}
+
+    def _resolve_system_vendor(sk: str) -> tuple[str | None, str]:
+        letter = sv_map.get(sk) or global_vid
+        if not letter:
+            return None, ""
+        label = str(atlas.vendors.get(letter, letter) or "")
+        return letter, label
 
     for system_key, body in sys_map.items():
         dels = body.get("deliveries") or {}
@@ -162,6 +168,14 @@ def generate_layer_backbone(
         )
         if not dfilter:
             continue
+
+        sys_vid, sys_label = _resolve_system_vendor(system_key)
+        per_system_vendor[system_key] = sys_vid or ""
+        ctx: Dict[str, Any] = {
+            "cid_map": cid_map,
+            "vendor_code": sys_vid,
+            "vendor_label": sys_label,
+        }
 
         if "Table" in dfilter and dels.get("Table"):
             t = dels["Table"]
@@ -190,6 +204,7 @@ def generate_layer_backbone(
                     rows_out.append(rdict)
             table_name = _sanitize_table_identifier(str(t.get("name") or system_key))
             tables[table_name] = rows_out
+            table_sources[table_name] = system_key
 
         if "File" in dfilter and dels.get("File"):
             f = dels["File"]
@@ -225,14 +240,30 @@ def generate_layer_backbone(
             topic = str(s.get("topic") or f"{layer_upper.lower()}.{slug}")
             events = _substitute_obj(copy.deepcopy(s.get("events") or []), pools, ctx)
             streams[topic] = events
+            stream_sources[topic] = system_key
+
+    used_letters = sorted({v for v in per_system_vendor.values() if v})
+    if len(used_letters) == 1:
+        run_vid = used_letters[0]
+        run_label = str(atlas.vendors.get(run_vid, run_vid))
+    elif len(used_letters) > 1:
+        run_vid = None
+        parts = [f"{atlas.vendors.get(c, c)} ({c})" for c in used_letters]
+        run_label = "Mixed: " + ", ".join(parts)
+    else:
+        run_vid = global_vid
+        run_label = str(atlas.vendors.get(run_vid, vendor_code or "") or "") if run_vid else ""
 
     return {
         "layer": layer_upper,
         "systems": list(sys_map.keys()),
-        "vendor_code": vid,
-        "vendor_label": vendor_label,
+        "vendor_code": run_vid,
+        "vendor_label": run_label,
+        "per_system_vendor": per_system_vendor,
+        "table_sources": table_sources,
         "tables": tables,
         "files": files,
         "vendor_api_index": vendor_api_index,
         "streams": streams,
+        "stream_sources": stream_sources,
     }

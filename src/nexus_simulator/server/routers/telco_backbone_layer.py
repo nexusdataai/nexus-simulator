@@ -40,7 +40,14 @@ def make_backbone_router(attr: str, registry_key: str, tag: str) -> APIRouter:
             default=None,
             description="Per product family: modalities to generate (Table, File, API, Stream)",
         )
-        vendor_code: Optional[str] = Field(default=None, description="Single letter: H,N,E,A,S,O,X")
+        vendor_code: Optional[str] = Field(
+            default=None,
+            description="Default vendor (single letter) when a row has no system_vendors entry",
+        )
+        system_vendors: Optional[Dict[str, str]] = Field(
+            default=None,
+            description="Per product family: vendor code (H,N,E,A,S,O,X)",
+        )
         refresh_identity: bool = False
         include_legacy_tables: bool = True
 
@@ -60,11 +67,15 @@ def make_backbone_router(attr: str, registry_key: str, tag: str) -> APIRouter:
                 if not modes:
                     continue
                 sd[k] = {str(m).strip() for m in modes if m}
+        sv = None
+        if body and body.system_vendors:
+            sv = {str(k): str(v) for k, v in body.system_vendors.items()}
         return await svc.generate_backbone(
             pools=get_telco_pools(),
             systems=systems,
             deliveries=deliveries,
             system_deliveries=sd,
+            system_vendors=sv,
             vendor_code=body.vendor_code if body else None,
             include_legacy_tables=body.include_legacy_tables if body else True,
         )

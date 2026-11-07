@@ -10,11 +10,23 @@ export interface SAPObjectsTableProps {
   isLoading: boolean;
   error: string | null;
   onSelectObject: (schema: string, table: string) => void;
+  /** Card title (default: FDW Objects) */
+  title?: string;
+  emptyMessage?: string;
+  filterPlaceholder?: string;
 }
 
 type SortKey = 'schemaName' | 'tableName' | 'columnCount' | 'rowCount';
 
-export function SAPObjectsTable({ objects, isLoading, error, onSelectObject }: SAPObjectsTableProps) {
+export function SAPObjectsTable({
+  objects,
+  isLoading,
+  error,
+  onSelectObject,
+  title = 'FDW Objects',
+  emptyMessage = 'No objects loaded. Click "Load Data" to load from S3.',
+  filterPlaceholder = 'Filter tables...',
+}: SAPObjectsTableProps) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('tableName');
   const [sortAsc, setSortAsc] = useState(true);
@@ -35,15 +47,24 @@ export function SAPObjectsTable({ objects, isLoading, error, onSelectObject }: S
 
   if (isLoading) {
     return (
-      <Card><CardHeader><CardTitle className="text-lg">FDW Objects</CardTitle></CardHeader>
-        <CardContent><div className="space-y-2">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 rounded" />)}</div></CardContent>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-10 rounded" />
+            ))}
+          </div>
+        </CardContent>
       </Card>
     );
   }
 
   if (error) {
     return (
-      <Card><CardHeader><CardTitle className="text-lg">FDW Objects</CardTitle></CardHeader>
+      <Card><CardHeader><CardTitle className="text-lg">{title}</CardTitle></CardHeader>
         <CardContent><div className="flex flex-col items-center py-6 text-center"><AlertTriangle className="h-8 w-8 text-yellow-500 mb-2" /><p className="text-sm text-muted-foreground">{error}</p></div></CardContent>
       </Card>
     );
@@ -54,17 +75,17 @@ export function SAPObjectsTable({ objects, isLoading, error, onSelectObject }: S
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div className="flex items-center gap-2">
           <TableProperties className="h-5 w-5 text-muted-foreground" />
-          <CardTitle className="text-lg">FDW Objects</CardTitle>
+          <CardTitle className="text-lg">{title}</CardTitle>
           <span className="text-xs text-muted-foreground">({filtered.length})</span>
         </div>
         <div className="relative w-56">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Filter tables..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
+          <Input placeholder={filterPlaceholder} value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
         </div>
       </CardHeader>
       <CardContent>
         {objects.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-6">No objects loaded. Click "Load Data" to load from S3.</p>
+          <p className="text-sm text-muted-foreground text-center py-6">{emptyMessage}</p>
         ) : (
           <div className="rounded-md border overflow-hidden">
             <table className="w-full text-sm">

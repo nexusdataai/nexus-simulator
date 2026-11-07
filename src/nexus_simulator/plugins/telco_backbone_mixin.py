@@ -198,6 +198,7 @@ class TelcoBackboneMixin:
         systems: Optional[Set[str]] = None,
         deliveries: Optional[Set[str]] = None,
         system_deliveries: Optional[Dict[str, Set[str]]] = None,
+        system_vendors: Optional[Dict[str, str]] = None,
         vendor_code: Optional[str] = None,
         include_legacy_tables: bool = True,
     ) -> dict[str, Any]:
@@ -205,12 +206,25 @@ class TelcoBackboneMixin:
         layer = self._layer_upper()
         svc_name = self.SERVICE_NAME
         pool = pools or get_telco_pools(seed=telco_rng_seed())
-        vid = (vendor_code or "").strip().upper()[:1] or default_vendor_for_layer(svc_name)
+        default_vid = default_vendor_for_layer(svc_name)
+        vid_in = (vendor_code or "").strip().upper()[:1] or None
         sys_arg = systems
         sd = system_deliveries
+        sv_clean: dict[str, str] | None = None
+        if system_vendors:
+            sv_clean = {}
+            for k, v in system_vendors.items():
+                if not v:
+                    continue
+                letter = str(v).strip().upper()[:1]
+                if letter:
+                    sv_clean[k] = letter
         if sd:
             keys = set(sd.keys())
             sys_arg = sys_arg.union(keys) if sys_arg is not None else keys
+        if sv_clean:
+            keys_sv = set(sv_clean.keys())
+            sys_arg = sys_arg.union(keys_sv) if sys_arg is not None else keys_sv
         del_arg = deliveries
         if sd and not del_arg:
             del_arg = None
@@ -220,16 +234,22 @@ class TelcoBackboneMixin:
             systems=sys_arg,
             deliveries=del_arg,
             system_deliveries=sd,
-            vendor_code=vid,
+            system_vendors=sv_clean,
+            vendor_code=vid_in or default_vid,
         )
 
         run_id = str(uuid.uuid4())
         generated_at = datetime.now(timezone.utc).isoformat()
         backbone["run_id"] = run_id
         backbone["generated_at"] = generated_at
-        backbone["vendor_code"] = vid
         atlas_c = load_atlas_catalog()
-        backbone["vendor_label"] = atlas_c.vendors.get(vid, vid)
+        out_vid = backbone.get("vendor_code")
+        if out_vid is None and isinstance(backbone.get("vendor_label"), str) and backbone["vendor_label"].startswith("Mixed:"):
+            out_vid = None
+        elif out_vid is None:
+            out_vid = vid_in or default_vid
+            backbone["vendor_label"] = atlas_c.vendors.get(out_vid, out_vid)
+        backbone["vendor_code"] = out_vid
 
         await self._cache_set_json(self._meta_prefix() + "bundle", backbone)
         await self._cache_set_json(self._meta_prefix() + "vendor_api_index", backbone.get("vendor_api_index") or {})
@@ -283,7 +303,7 @@ class TelcoBackboneMixin:
         sm["backbone"] = {
             "run_id": run_id,
             "generated_at": generated_at,
-            "vendor_code": vid,
+            "vendor_code": backbone.get("vendor_code"),
             "vendor_label": backbone.get("vendor_label"),
             "systems": len(backbone.get("systems") or []),
             "tables": len(atlas_tables),
@@ -318,45 +338,67 @@ class TelcoBackboneMixin:
             }
         layer = bundle.get("layer") or self._layer_upper()
         atlas_schema = self._atlas_schema_name()
+        psv = bundle.get("per_system_vendor") or {}
+        if not isinstance(psv, dict):
+            psv = {}
+        tbl_src = bundle.get("table_sources") or {}
+        if not isinstance(tbl_src, dict):
+            tbl_src = {}
         tbl_rows = []
         tmap = bundle.get("tables") or {}
         for tname, rows in tmap.items():
+            sk = str(tbl_src.get(tname) or "")
+            vc = psv.get(sk) if sk else None
             tbl_rows.append(
                 {
                     "schema": atlas_schema,
                     "table": tname,
                     "rows": len(rows or []),
+                    "system_key": sk or None,
+                    "vendor_code": vc,
                 }
             )
         api_rows = []
         for _lk, ent in (bundle.get("vendor_api_index") or {}).items():
             if not isinstance(ent, dict):
                 continue
+            sk_ent = ent.get("system_key")
+            sk_s = str(sk_ent) if sk_ent else ""
             api_rows.append(
                 {
                     "method": ent.get("method", "GET"),
                     "route_path": ent.get("route_path"),
-                    "system_key": ent.get("system_key"),
+                    "system_key": sk_ent,
                     "fixture_path": ent.get("fixture_path"),
+                    "vendor_code": psv.get(sk_s) if sk_s else None,
                 }
             )
         file_rows = []
         for f in bundle.get("files") or []:
             if not isinstance(f, dict):
                 continue
+            fsk = f.get("system_key")
+            fs = str(fsk) if fsk else ""
             file_rows.append(
                 {
                     "name": f.get("name"),
                     "path": f.get("path"),
-                    "system_key": f.get("system_key"),
+                    "system_key": fsk,
+                    "vendor_code": psv.get(fs) if fs else None,
                 }
             )
         stream_rows = []
+        strm_src = bundle.get("stream_sources") or {}
+        if not isinstance(strm_src, dict):
+            strm_src = {}
         for topic, events in (bundle.get("streams") or {}).items():
+            sk_t = str(strm_src.get(topic) or "")
             stream_rows.append(
                 {
                     "topic": topic,
                     "event_count": len(events or []),
+                    "system_key": sk_t or None,
+                    "vendor_code": psv.get(sk_t) if sk_t else None,
                 }
             )
         return {
