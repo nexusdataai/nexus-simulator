@@ -17,10 +17,15 @@ export interface SFDCSimulatorStatus {
   loaded: boolean;
   bucket: string;
   prefix: string;
+  table_data_prefix?: string;
+  files_data_prefix?: string;
   schema: string;
   table_count: number;
   tables_with_data: number;
   total_rows: number;
+  file_count?: number;
+  api_count?: number;
+  stream_count?: number;
   dump_timestamp?: string | null;
   last_loaded?: string | null;
   dump_available?: boolean;

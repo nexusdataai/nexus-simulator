@@ -87,6 +87,34 @@ def make_backbone_router(attr: str, registry_key: str, tag: str) -> APIRouter:
             raise HTTPException(status_code=501, detail="backbone summary not supported")
         return await svc.get_backbone_summary()
 
+    @router.get("/backbone/status", tags=[tag])
+    async def backbone_display_status(request: Request):
+        """Simulator status enriched with backbone artifact counts and S3 layout."""
+        svc = _svc(request)
+        if not hasattr(svc, "get_backbone_summary"):
+            raise HTTPException(status_code=501, detail="backbone status not supported")
+        st = dict(svc.get_status())
+        summary = await svc.get_backbone_summary()
+        run_id = summary.get("run_id")
+        s3_base = ""
+        if run_id and hasattr(svc, "_backbone_s3_base"):
+            s3_base = svc._backbone_s3_base(str(run_id))
+        table_prefix = str(st.get("prefix") or st.get("table_data_prefix") or "")
+        st["table_data_prefix"] = table_prefix
+        if s3_base:
+            st["files_data_prefix"] = f"{s3_base}/files"
+            st["backbone_s3_base"] = s3_base
+        elif not st.get("files_data_prefix"):
+            st["files_data_prefix"] = f"{table_prefix}/files".rstrip("/") if table_prefix else ""
+        st["file_count"] = len(summary.get("files") or [])
+        st["api_count"] = len(summary.get("apis") or [])
+        st["stream_count"] = len(summary.get("streams") or [])
+        st["backbone_run_id"] = run_id
+        st["backbone_generated_at"] = summary.get("generated_at")
+        st["vendor_label"] = summary.get("vendor_label")
+        st["vendor_code"] = summary.get("vendor_code")
+        return st
+
     @router.get("/backbone/artifacts", tags=[tag])
     async def backbone_artifacts(request: Request):
         svc = _svc(request)

@@ -20,6 +20,11 @@ import {
   TelcoBackboneArtifactPreviewDialog,
   type PreviewTarget,
 } from './TelcoBackboneArtifactPreviewDialog';
+import { SimulatorArtifactStatusCard } from '@/components/simulator-shared/SimulatorArtifactStatusCard';
+import { artifactMetaFromStatus } from '@/components/simulator-shared/simulatorArtifactMeta';
+import { artifactKpiStats, KpiStatGrid } from '@/components/simulator-shared/artifactKpiStats';
+import { SimulatorDeliveryTabs } from '@/components/simulator-shared/SimulatorDeliveryTabs';
+import type { SimulatorStatus } from '@/services/sapSimulatorService';
 
 const DELIVERY_MODES = ['Table', 'File', 'API', 'Stream'] as const;
 type DeliveryMode = (typeof DELIVERY_MODES)[number];
@@ -91,6 +96,9 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
   const [browseTable, setBrowseTable] = useState('');
   const [artifactPreview, setArtifactPreview] = useState<PreviewTarget>(null);
   const [artifactPreviewOpen, setArtifactPreviewOpen] = useState(false);
+  const [backboneStatus, setBackboneStatus] = useState<SimulatorStatus | null>(null);
+  const [loadingBackboneStatus, setLoadingBackboneStatus] = useState(false);
+  const [backboneStatusError, setBackboneStatusError] = useState<string | null>(null);
 
   const loadCatalog = useCallback(async () => {
     const res = await fetch(`${apiBase}/backbone/catalog`);
@@ -127,6 +135,21 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
     }
   }, [apiBase]);
 
+  const fetchBackboneStatus = useCallback(async () => {
+    setLoadingBackboneStatus(true);
+    setBackboneStatusError(null);
+    try {
+      const res = await fetch(`${apiBase}/backbone/status`);
+      if (!res.ok) throw new Error(await res.text());
+      setBackboneStatus((await res.json()) as SimulatorStatus);
+    } catch (e) {
+      setBackboneStatus(null);
+      setBackboneStatusError((e as Error).message || 'Failed to load status');
+    } finally {
+      setLoadingBackboneStatus(false);
+    }
+  }, [apiBase]);
+
   const fetchFdwObjects = useCallback(async () => {
     if (!simulatorService) return;
     setLoadingFdwObjects(true);
@@ -148,7 +171,8 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
 
   useEffect(() => {
     fetchSummary().catch(() => {});
-  }, [fetchSummary, apiBase]);
+    fetchBackboneStatus().catch(() => {});
+  }, [fetchSummary, fetchBackboneStatus, apiBase]);
 
   useEffect(() => {
     fetchFdwObjects();
@@ -242,6 +266,7 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
         await fetchSummary();
       }
       await fetchFdwObjects();
+      await fetchBackboneStatus();
       setConfigOpen(false);
     } catch (e) {
       setError(String(e));
@@ -272,6 +297,15 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
     setArtifactPreview(target);
     setArtifactPreviewOpen(true);
   }, []);
+
+  const artifactMeta = useMemo(() => artifactMetaFromStatus(backboneStatus), [backboneStatus]);
+  const kpiStats = useMemo(() => (artifactMeta ? artifactKpiStats(artifactMeta) : []), [artifactMeta]);
+
+  const tableTabCounts = useMemo(() => {
+    const fromSummary = summary?.tables?.length ?? 0;
+    const fromFdw = atlasObjects.length;
+    return fromFdw > 0 ? fromFdw : fromSummary;
+  }, [summary?.tables, atlasObjects.length]);
 
   if (!catalog) {
     return (
@@ -312,6 +346,7 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
             onClick={() => {
               fetchSummary();
               fetchFdwObjects();
+              fetchBackboneStatus();
             }}
             disabled={refreshingSummary || loadingFdwObjects}
           >
@@ -330,6 +365,18 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
       </div>
 
       {error && <p className="text-xs text-destructive">{error}</p>}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SimulatorArtifactStatusCard
+          meta={artifactMeta}
+          isLoading={loadingBackboneStatus}
+          error={backboneStatusError}
+          onRefresh={() => {
+            void fetchBackboneStatus();
+          }}
+        />
+        <KpiStatGrid stats={kpiStats} />
+      </div>
 
       <Dialog open={configOpen} onOpenChange={setConfigOpen}>
         <DialogContent className="max-w-[min(100vw-2rem,56rem)] max-h-[min(90vh,720px)] flex flex-col gap-0 p-0 sm:rounded-lg">
@@ -450,101 +497,61 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
         </DialogContent>
       </Dialog>
 
-      <section aria-label="Generated data">
-        <h2 className="text-sm font-semibold mb-3">Generated data</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="shadow-none flex flex-col min-h-[280px] md:col-span-2">
-            <CardHeader className="py-3 px-4 pb-0">
-              <CardTitle className="text-sm">Tables</CardTitle>
-              <p className="text-[11px] text-muted-foreground font-normal mt-1">
-                Atlas schema <code className="text-[10px]">{atlasSchema}</code>
-                {simulatorService && (
-                  <span className="block mt-1">
-                    Click a table to preview rows (same FDW list as before). Generate with Table delivery to populate.
-                  </span>
-                )}
-              </p>
-            </CardHeader>
-            <CardContent className="px-2 pb-4 pt-2 flex-1 min-h-0 max-h-[min(55vh,520px)] overflow-y-auto">
-              {simulatorService ? (
-                <div className="[&_.rounded-md.border]:text-sm">
-                  <SAPObjectsTable
-                    objects={atlasObjects}
-                    isLoading={loadingFdwObjects}
-                    error={fdwObjectsError}
-                    onSelectObject={handleSelectAtlasTable}
-                    title={`Atlas tables (${atlasSchema})`}
-                    emptyMessage={`No tables in ${atlasSchema} yet. Configure backbone with Table delivery and Generate.`}
-                    filterPlaceholder={`Filter ${atlasSchema} tables...`}
-                  />
+      <section aria-label="Generated data" className="space-y-3">
+        <h2 className="text-sm font-semibold">Generated data</h2>
+        <SimulatorDeliveryTabs
+          counts={{
+            table: tableTabCounts,
+            file: summary?.files?.length ?? artifactMeta?.fileCount,
+            api: summary?.apis?.length ?? artifactMeta?.apiCount,
+            stream: summary?.streams?.length ?? artifactMeta?.streamCount,
+          }}
+          tables={
+            <div className="space-y-2">
+                <p className="text-[11px] text-muted-foreground px-1">
+                  Atlas schema <code className="text-[10px]">{atlasSchema}</code> — click a table to preview rows.
+                </p>
+                <div className="max-h-[min(55vh,520px)] overflow-y-auto [&_.rounded-md.border]:text-sm">
+                  {simulatorService ? (
+                    <SAPObjectsTable
+                      objects={atlasObjects}
+                      isLoading={loadingFdwObjects}
+                      error={fdwObjectsError}
+                      onSelectObject={handleSelectAtlasTable}
+                      title={`Atlas tables (${atlasSchema})`}
+                      emptyMessage={`No tables in ${atlasSchema} yet. Configure backbone with Table delivery and Generate.`}
+                      filterPlaceholder={`Filter ${atlasSchema} tables...`}
+                    />
+                  ) : (
+                    <p className="text-muted-foreground text-[11px] px-2">Table browser unavailable.</p>
+                  )}
                 </div>
-              ) : summary?.tables?.length ? (
-                <div className="px-2 text-[11px] space-y-1">
-                  {summary.tables.map((t, i) => (
-                    <div key={`${t.schema}.${t.table}.${i}`} className="font-mono text-[10px] break-all">
-                      {t.schema}.{t.table} <span className="text-muted-foreground">({t.rows ?? 0} rows)</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-[11px] px-2">Open Configure backbone, pick Table deliveries, then Generate.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-none flex flex-col min-h-[280px] md:col-span-2">
-            <CardHeader className="py-3 px-4 pb-0">
-              <CardTitle className="text-sm">Files</CardTitle>
-              <p className="text-[11px] text-muted-foreground font-normal mt-1">
-                Generated files under the simulator export prefix. Click a file name or <strong className="font-medium">View</strong>{' '}
-                to preview contents (CSV, JSON, or text).
-              </p>
-            </CardHeader>
-            <CardContent className="px-3 pb-4 pt-3 flex-1 overflow-y-auto max-h-[min(50vh,420px)]">
-              <TelcoBackboneFilesTable
-                catalog={catalog}
-                files={summary?.files ?? []}
-                onPreviewFile={openArtifactPreview}
-              />
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-none flex flex-col min-h-[280px] md:col-span-2">
-            <CardHeader className="py-3 px-4 pb-0">
-              <CardTitle className="text-sm">APIs</CardTitle>
-              <p className="text-[11px] text-muted-foreground font-normal mt-1">
-                Vendor routes under <code className="text-[10px]">{apiBase}/vendor-api/</code>. Use{' '}
-                <strong className="font-medium">View</strong> to inspect the JSON response body.
-              </p>
-            </CardHeader>
-            <CardContent className="px-3 pb-4 pt-3 flex-1 overflow-y-auto max-h-[min(50vh,420px)]">
-              <TelcoBackboneApisTable
-                catalog={catalog}
-                apis={summary?.apis ?? []}
-                apiBase={apiBase}
-                onPreviewApi={openArtifactPreview}
-              />
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-none flex flex-col min-h-[280px] md:col-span-2">
-            <CardHeader className="py-3 px-4 pb-0">
-              <CardTitle className="text-sm">Streams</CardTitle>
-              <p className="text-[11px] text-muted-foreground font-normal mt-1">
-                Kafka-style topics with SSE replay for dev. <strong className="font-medium">View</strong> shows event payloads;{' '}
-                <strong className="font-medium">replay</strong> opens the live SSE endpoint.
-              </p>
-            </CardHeader>
-            <CardContent className="px-3 pb-4 pt-3 flex-1 overflow-y-auto max-h-[min(50vh,420px)]">
-              <TelcoBackboneStreamsTable
-                catalog={catalog}
-                streams={summary?.streams ?? []}
-                apiBase={apiBase}
-                onPreviewStream={openArtifactPreview}
-              />
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          }
+          files={
+            <TelcoBackboneFilesTable
+              catalog={catalog}
+              files={summary?.files ?? []}
+              onPreviewFile={openArtifactPreview}
+            />
+          }
+          apis={
+            <TelcoBackboneApisTable
+              catalog={catalog}
+              apis={summary?.apis ?? []}
+              apiBase={apiBase}
+              onPreviewApi={openArtifactPreview}
+            />
+          }
+          streams={
+            <TelcoBackboneStreamsTable
+              catalog={catalog}
+              streams={summary?.streams ?? []}
+              apiBase={apiBase}
+              onPreviewStream={openArtifactPreview}
+            />
+          }
+        />
       </section>
 
       {simulatorService && (

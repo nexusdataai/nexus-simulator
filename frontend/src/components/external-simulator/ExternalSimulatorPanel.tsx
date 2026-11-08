@@ -13,6 +13,10 @@ import {
   type ExternalObjectSummary,
   type ExternalRecordsResponse,
 } from '../../services/externalSimulatorService';
+import { SimulatorArtifactStatusCard } from '@/components/simulator-shared/SimulatorArtifactStatusCard';
+import { artifactMetaFromStatus } from '@/components/simulator-shared/simulatorArtifactMeta';
+import { artifactKpiStats, KpiStatGrid } from '@/components/simulator-shared/artifactKpiStats';
+import { ArtifactModalityEmpty, SimulatorDeliveryTabs } from '@/components/simulator-shared/SimulatorDeliveryTabs';
 
 const SYSTEM_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   Google_Drive: { label: 'Google Drive', icon: Globe, color: 'text-red-400' },
@@ -100,6 +104,9 @@ export function ExternalSimulatorPanel() {
     }
   };
 
+  const artifactMeta = artifactMetaFromStatus(status);
+  const kpiStats = artifactMeta ? artifactKpiStats(artifactMeta) : [];
+
   const grouped = objects.reduce<Record<string, ExternalObjectSummary[]>>((acc, o) => {
     (acc[o.system] ??= []).push(o);
     return acc;
@@ -136,51 +143,24 @@ export function ExternalSimulatorPanel() {
         </div>
       )}
 
-      {/* Status Cards */}
-      {status && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    {status.loaded ? (
-                      <Badge className="bg-green-100 text-green-800 border-green-200">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />Loaded
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline">
-                        <XCircle className="h-3 w-3 mr-1" />Not Loaded
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <p className="text-sm text-muted-foreground">Tables</p>
-              <p className="text-2xl font-bold">{status.table_count}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <p className="text-sm text-muted-foreground">Total Rows</p>
-              <p className="text-2xl font-bold">{status.total_rows.toLocaleString()}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <p className="text-sm text-muted-foreground">Last Loaded</p>
-              <p className="text-sm font-medium">{status.last_loaded ? new Date(status.last_loaded).toLocaleString() : 'Never'}</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SimulatorArtifactStatusCard
+          meta={artifactMeta}
+          isLoading={loading && !status}
+          error={error}
+          onRefresh={refresh}
+        />
+        <KpiStatGrid stats={kpiStats} />
+      </div>
 
-      {/* System breakdown + table list + data browser */}
+      <SimulatorDeliveryTabs
+        counts={{
+          table: artifactMeta?.tableCount,
+          file: artifactMeta?.fileCount,
+          api: artifactMeta?.apiCount,
+          stream: artifactMeta?.streamCount,
+        }}
+        tables={
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: table list grouped by system */}
         <Card className="lg:col-span-1">
@@ -283,6 +263,11 @@ export function ExternalSimulatorPanel() {
           </CardContent>
         </Card>
       </div>
+        }
+        files={<ArtifactModalityEmpty modality="File" hint="File Uploads tables hold uploaded file metadata; binary exports are not listed here." />}
+        apis={<ArtifactModalityEmpty modality="API" />}
+        streams={<ArtifactModalityEmpty modality="Stream" hint="Social listening events are exposed as tables in this simulator." />}
+      />
     </div>
   );
 }

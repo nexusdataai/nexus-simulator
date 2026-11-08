@@ -10,15 +10,24 @@ export interface SimulatorStatus {
   loaded: boolean;
   bucket: string;
   prefix: string;
+  table_data_prefix?: string;
+  files_data_prefix?: string;
   schema: string;
   table_count: number;
   tables_with_data: number;
   total_rows: number;
+  file_count?: number;
+  api_count?: number;
+  stream_count?: number;
   dump_timestamp?: string | null;
   last_loaded?: string | null;
   dump_available?: boolean;
   dump_tables?: number;
   dump_rows?: number;
+  backbone_run_id?: string | null;
+  backbone_generated_at?: string | null;
+  vendor_label?: string | null;
+  backbone_s3_base?: string;
 }
 
 export interface AdminResponse {

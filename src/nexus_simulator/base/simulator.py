@@ -483,15 +483,22 @@ class BaseSimulator(ABC):
     # ─── Status ──────────────────────────────────────────────────────────
 
     def get_status(self) -> dict[str, Any]:
+        prefix = self.prefix or ""
+        files_prefix = f"{prefix}/files".rstrip("/") if prefix else ""
         return {
             "enabled": self.enabled,
             "loaded": self._loaded,
             "bucket": self.bucket,
-            "prefix": self.prefix,
+            "prefix": prefix,
+            "table_data_prefix": prefix,
+            "files_data_prefix": files_prefix,
             "schema": self._manifest.get("schema", ""),
             "table_count": len(self._tables),
             "tables_with_data": self._tables_with_data,
             "total_rows": self._total_rows,
+            "file_count": 0,
+            "api_count": 0,
+            "stream_count": 0,
             "dump_timestamp": self._manifest.get("dump_timestamp"),
             "last_loaded": self._loaded_at.isoformat() if self._loaded_at else None,
         }

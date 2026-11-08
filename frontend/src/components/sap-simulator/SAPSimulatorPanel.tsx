@@ -3,8 +3,11 @@ import { Button } from '../ui/button';
 import { useToast } from '../../hooks/use-toast';
 import { RefreshCw, Download, Trash2, Loader2, AlertCircle } from 'lucide-react';
 
-import { SAPStatusCard } from './SAPStatusCard';
 import { SAPObjectsTable } from './SAPObjectsTable';
+import { SimulatorArtifactStatusCard } from '@/components/simulator-shared/SimulatorArtifactStatusCard';
+import { artifactMetaFromStatus } from '@/components/simulator-shared/simulatorArtifactMeta';
+import { artifactKpiStats, KpiStatGrid } from '@/components/simulator-shared/artifactKpiStats';
+import { ArtifactModalityEmpty, SimulatorDeliveryTabs } from '@/components/simulator-shared/SimulatorDeliveryTabs';
 import { SAPDataBrowserModal } from './SAPDataBrowserModal';
 import { SAPActivityLog } from './SAPActivityLog';
 
@@ -127,11 +130,8 @@ export function SAPSimulatorPanel() {
 
   const handleSelectObject = (schema: string, table: string) => { setSelectedSchema(schema); setSelectedTable(table); setBrowserOpen(true); };
 
-  const stats = state.status ? [
-    { label: 'Tables', value: state.status.table_count, color: 'text-blue-400' },
-    { label: 'With Data', value: state.status.tables_with_data, color: 'text-green-400' },
-    { label: 'Total Rows', value: state.status.total_rows.toLocaleString(), color: 'text-purple-400' },
-  ] : [];
+  const artifactMeta = artifactMetaFromStatus(state.status);
+  const stats = artifactMeta ? artifactKpiStats(artifactMeta) : [];
 
   return (
     <div className="space-y-6">
@@ -164,20 +164,34 @@ export function SAPSimulatorPanel() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <SAPStatusCard status={state.status} isLoading={state.loadingStatus} error={state.statusError} onRefresh={fetchStatus} />
-        {stats.length > 0 && (
-          <div className="grid grid-cols-3 gap-3">
-            {stats.map(s => (
-              <div key={s.label} className="rounded-lg border bg-card p-4 flex flex-col items-center justify-center">
-                <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        )}
+        <SimulatorArtifactStatusCard
+          meta={artifactMeta}
+          isLoading={state.loadingStatus}
+          error={state.statusError}
+          onRefresh={fetchStatus}
+        />
+        <KpiStatGrid stats={stats} />
       </div>
 
-      <SAPObjectsTable objects={state.objects} isLoading={state.loadingObjects} error={state.objectsError} onSelectObject={handleSelectObject} />
+      <SimulatorDeliveryTabs
+        counts={{
+          table: artifactMeta?.tableCount,
+          file: artifactMeta?.fileCount,
+          api: artifactMeta?.apiCount,
+          stream: artifactMeta?.streamCount,
+        }}
+        tables={
+          <SAPObjectsTable
+            objects={state.objects}
+            isLoading={state.loadingObjects}
+            error={state.objectsError}
+            onSelectObject={handleSelectObject}
+          />
+        }
+        files={<ArtifactModalityEmpty modality="File" hint="SAP simulator persists FDW tables from S3; file artifacts are not generated here." />}
+        apis={<ArtifactModalityEmpty modality="API" />}
+        streams={<ArtifactModalityEmpty modality="Stream" />}
+      />
       <SAPDataBrowserModal isOpen={browserOpen} schema={selectedSchema} table={selectedTable} onClose={() => setBrowserOpen(false)} />
     </div>
   );
