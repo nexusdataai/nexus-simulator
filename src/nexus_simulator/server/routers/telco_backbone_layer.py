@@ -143,6 +143,17 @@ def make_backbone_router(attr: str, registry_key: str, tag: str) -> APIRouter:
             return JSONResponse(content=body)
         return JSONResponse(content=body if body is not None else {})
 
+    @router.get("/backbone/stream-events", tags=[tag])
+    async def backbone_stream_events(request: Request, topic: str = Query(...)):
+        """JSON manifest of replay events for a topic (UI preview)."""
+        svc = _svc(request)
+        streams = await svc.get_stream_topics()
+        decoded = urllib.parse.unquote(topic)
+        events = streams.get(decoded)
+        if events is None:
+            raise HTTPException(status_code=404, detail=f"unknown topic: {decoded}")
+        return {"topic": decoded, "count": len(events), "events": events}
+
     @router.get("/backbone/stream/{topic:path}", tags=[tag])
     async def backbone_stream(request: Request, topic: str):
         svc = _svc(request)

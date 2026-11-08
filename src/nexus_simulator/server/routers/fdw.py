@@ -119,3 +119,22 @@ async def write_table(body: WriteTableRequest, request: Request, source: Optiona
     else:
         raise HTTPException(status_code=500, detail="simulator missing write_table")
     return {"success": True, "rowCount": count}
+
+
+@router.post("/save-to-s3")
+async def save_to_s3(request: Request, source: Optional[str] = Query(None)):
+    """Persist simulator catalogue + table data to S3 (external plugin full dump)."""
+    svc = _pick(request, source)
+    if hasattr(svc, "ensure_loaded"):
+        await svc.ensure_loaded()
+    if hasattr(svc, "save_to_s3"):
+        try:
+            return await svc.save_to_s3()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"simulator save_to_s3 failed: {exc}") from exc
+    return {
+        "success": True,
+        "message": "No full S3 dump; per-table persist runs on write_table",
+        "tables": 0,
+        "rows": 0,
+    }

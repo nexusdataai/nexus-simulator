@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Loader2, Play, RefreshCw, Settings2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { SAPObjectsTable } from '@/components/sap-simulator/SAPObjectsTable';
 import { SAPDataBrowserModal } from '@/components/sap-simulator/SAPDataBrowserModal';
 import type { CPQSimulatorService } from '@/services/cpqSimulatorService';
@@ -15,22 +14,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import type { BackboneCatalog } from './telcoBackboneTypes';
+import { TelcoBackboneApisTable, TelcoBackboneFilesTable, TelcoBackboneStreamsTable } from './TelcoBackboneSummaryTables';
+import {
+  TelcoBackboneArtifactPreviewDialog,
+  type PreviewTarget,
+} from './TelcoBackboneArtifactPreviewDialog';
 
 const DELIVERY_MODES = ['Table', 'File', 'API', 'Stream'] as const;
 type DeliveryMode = (typeof DELIVERY_MODES)[number];
-
-type CatalogRow = {
-  system_key: string;
-  slug: string;
-  deliveries: string[];
-};
-
-type BackboneCatalog = {
-  layer: string;
-  vendors: Record<string, string>;
-  vendor_default: string;
-  systems: CatalogRow[];
-};
 
 type SummaryRow = {
   schema?: string;
@@ -68,86 +60,12 @@ interface Props {
   simulatorSubtitle?: string;
 }
 
-/** Parent folder for generated file paths (e.g. incoming/bss/slug/file.csv → /incoming/bss/slug) */
-function destinationFolderFromPath(path: string | undefined): string {
-  if (!path) return '';
-  const n = path.replace(/\\/g, '/').trim();
-  const i = n.lastIndexOf('/');
-  if (i <= 0) return '/';
-  return n.slice(0, i);
-}
-
-/** Match backend: incoming/{layer}/{slug}/... */
-function inferSystemKeyFromFilePath(catalog: BackboneCatalog, path: string | undefined): string | null {
-  if (!path) return null;
-  const parts = path.replace(/\\/g, '/').split('/').filter(Boolean);
-  if (parts[0] !== 'incoming' || parts.length < 3) return null;
-  const slug = parts[2];
-  const row = catalog.systems.find((r) => r.slug === slug);
-  return row?.system_key ?? null;
-}
-
-function resolveProductFamily(
-  catalog: BackboneCatalog,
-  systemKey: string | null | undefined,
-  filePath?: string | null,
-): { key: string; slug?: string } | null {
-  const key = (systemKey && systemKey.trim()) || inferSystemKeyFromFilePath(catalog, filePath || undefined);
-  if (!key) return null;
-  const slug = catalog.systems.find((r) => r.system_key === key)?.slug;
-  return { key, slug };
-}
-
-function ProductFamilyLine({
-  catalog,
-  systemKey,
-  filePath,
-}: {
-  catalog: BackboneCatalog;
-  systemKey?: string | null;
-  filePath?: string | null;
-}) {
-  const fam = resolveProductFamily(catalog, systemKey, filePath);
-  if (!fam) {
-    return (
-      <div className="flex flex-wrap items-center gap-1.5 mt-1">
-        <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Product family</span>
-        <span className="text-[10px] text-muted-foreground">—</span>
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-wrap items-center gap-1.5 mt-1">
-      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Product family</span>
-      <Badge variant="secondary" className="text-[10px] font-normal px-1.5 py-0 max-w-[min(100%,28rem)] truncate" title={fam.key}>
-        {fam.key}
-      </Badge>
-      {fam.slug ? (
-        <code className="text-[9px] text-muted-foreground truncate max-w-[12rem]" title={fam.slug}>
-          {fam.slug}
-        </code>
-      ) : null}
-    </div>
-  );
-}
-
 function deliverySetFromCatalog(d: string[]): Set<DeliveryMode> {
   const s = new Set<DeliveryMode>();
   for (const m of DELIVERY_MODES) {
     if (d.includes(m)) s.add(m);
   }
   return s;
-}
-
-function vendorBadge(catalog: BackboneCatalog, code: string | null | undefined) {
-  if (!code) return null;
-  const label = catalog.vendors[code];
-  if (!label) return <span className="text-muted-foreground">({code})</span>;
-  return (
-    <span className="text-muted-foreground">
-      {label} ({code})
-    </span>
-  );
 }
 
 export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, simulatorSubtitle }: Props) {
@@ -171,6 +89,8 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
   const [browserOpen, setBrowserOpen] = useState(false);
   const [browseSchema, setBrowseSchema] = useState('');
   const [browseTable, setBrowseTable] = useState('');
+  const [artifactPreview, setArtifactPreview] = useState<PreviewTarget>(null);
+  const [artifactPreviewOpen, setArtifactPreviewOpen] = useState(false);
 
   const loadCatalog = useCallback(async () => {
     const res = await fetch(`${apiBase}/backbone/catalog`);
@@ -342,17 +262,15 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
     return fdwObjects.filter((o) => o.schemaName === atlasSchema);
   }, [simulatorService, atlasSchema, fdwObjects]);
 
-  const fileDestinationNote = useMemo(() => {
-    const paths = (summary?.files || []).map((f) => f.path).filter(Boolean) as string[];
-    const folders = new Set(paths.map(destinationFolderFromPath).filter(Boolean));
-    if (folders.size === 1) return Array.from(folders)[0];
-    return null;
-  }, [summary?.files]);
-
   const handleSelectAtlasTable = useCallback((schema: string, table: string) => {
     setBrowseSchema(schema);
     setBrowseTable(table);
     setBrowserOpen(true);
+  }, []);
+
+  const openArtifactPreview = useCallback((target: PreviewTarget) => {
+    setArtifactPreview(target);
+    setArtifactPreviewOpen(true);
   }, []);
 
   if (!catalog) {
@@ -574,106 +492,56 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
             </CardContent>
           </Card>
 
-          <Card className="shadow-none flex flex-col min-h-[280px]">
+          <Card className="shadow-none flex flex-col min-h-[280px] md:col-span-2">
             <CardHeader className="py-3 px-4 pb-0">
               <CardTitle className="text-sm">Files</CardTitle>
               <p className="text-[11px] text-muted-foreground font-normal mt-1">
-                Generated files are written under the simulator export prefix (e.g. S3{' '}
-                <code className="text-[10px]">…/telco-backbone/&lt;layer&gt;/&lt;run_id&gt;/files/</code>
-                ). Destination folder per file:
+                Generated files under the simulator export prefix. Click a file name or <strong className="font-medium">View</strong>{' '}
+                to preview contents (CSV, JSON, or text).
               </p>
-              {fileDestinationNote && summary?.files && summary.files.length > 1 && (
-                <p className="text-[10px] text-muted-foreground mt-1 font-mono break-all">
-                  All in this run: <span className="text-foreground">{fileDestinationNote}</span>
-                </p>
-              )}
             </CardHeader>
-            <CardContent className="px-4 pb-4 pt-3 flex-1 overflow-y-auto max-h-[360px] text-[11px] space-y-3">
-              {summary?.files?.length ? (
-                summary.files.map((f, i) => {
-                  const folder = destinationFolderFromPath(f.path);
-                  return (
-                    <div key={`${f.path}-${i}`} className="border-b border-border/60 pb-2 last:border-0 last:pb-0">
-                      <ProductFamilyLine catalog={catalog} systemKey={f.system_key} filePath={f.path} />
-                      <div className="font-medium mt-0.5">{f.name || f.path?.split('/').pop()}</div>
-                      {f.vendor_code && (
-                        <div className="text-[10px] text-muted-foreground mt-0.5">Vendor: {vendorBadge(catalog, f.vendor_code)}</div>
-                      )}
-                      <div className="text-[10px] text-muted-foreground font-mono mt-0.5 break-all">
-                        <span className="text-muted-foreground">Destination: </span>
-                        {folder || '—'}
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-muted-foreground">Enable File delivery for a family, then Generate.</p>
-              )}
+            <CardContent className="px-3 pb-4 pt-3 flex-1 overflow-y-auto max-h-[min(50vh,420px)]">
+              <TelcoBackboneFilesTable
+                catalog={catalog}
+                files={summary?.files ?? []}
+                onPreviewFile={openArtifactPreview}
+              />
             </CardContent>
           </Card>
 
-          <Card className="shadow-none flex flex-col min-h-[280px]">
+          <Card className="shadow-none flex flex-col min-h-[280px] md:col-span-2">
             <CardHeader className="py-3 px-4 pb-0">
               <CardTitle className="text-sm">APIs</CardTitle>
               <p className="text-[11px] text-muted-foreground font-normal mt-1">
-                Vendor routes under <code className="text-[10px]">{apiBase}/vendor-api/</code>
+                Vendor routes under <code className="text-[10px]">{apiBase}/vendor-api/</code>. Use{' '}
+                <strong className="font-medium">View</strong> to inspect the JSON response body.
               </p>
             </CardHeader>
-            <CardContent className="px-4 pb-4 pt-3 flex-1 overflow-y-auto max-h-[360px] text-[11px] space-y-2">
-              {summary?.apis?.length ? (
-                summary.apis.map((a, i) => {
-                  const rp = (a.route_path || '').replace(/^\//, '');
-                  const href = `${apiBase}/vendor-api/${rp}`;
-                  return (
-                    <div key={`${a.method}-${a.route_path}-${i}`} className="space-y-1">
-                      <ProductFamilyLine catalog={catalog} systemKey={a.system_key} />
-                      {a.vendor_code && (
-                        <div className="text-muted-foreground text-[10px]">Vendor: {vendorBadge(catalog, a.vendor_code)}</div>
-                      )}
-                      <div>
-                        <span className="text-muted-foreground">{a.method}</span>{' '}
-                        <a href={href} className="text-primary break-all" target="_blank" rel="noreferrer">
-                          {href}
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-muted-foreground">Enable API delivery for a family, then Generate.</p>
-              )}
+            <CardContent className="px-3 pb-4 pt-3 flex-1 overflow-y-auto max-h-[min(50vh,420px)]">
+              <TelcoBackboneApisTable
+                catalog={catalog}
+                apis={summary?.apis ?? []}
+                apiBase={apiBase}
+                onPreviewApi={openArtifactPreview}
+              />
             </CardContent>
           </Card>
 
-          <Card className="shadow-none flex flex-col min-h-[280px]">
+          <Card className="shadow-none flex flex-col min-h-[280px] md:col-span-2">
             <CardHeader className="py-3 px-4 pb-0">
               <CardTitle className="text-sm">Streams</CardTitle>
-              <p className="text-[11px] text-muted-foreground font-normal mt-1">SSE replay (dev)</p>
+              <p className="text-[11px] text-muted-foreground font-normal mt-1">
+                Kafka-style topics with SSE replay for dev. <strong className="font-medium">View</strong> shows event payloads;{' '}
+                <strong className="font-medium">replay</strong> opens the live SSE endpoint.
+              </p>
             </CardHeader>
-            <CardContent className="px-4 pb-4 pt-3 flex-1 overflow-y-auto max-h-[360px] text-[11px] space-y-2">
-              {summary?.streams?.length ? (
-                summary.streams.map((srow, i) => {
-                  const enc = encodeURIComponent(srow.topic || '');
-                  const href = `${apiBase}/backbone/stream/${enc}`;
-                  return (
-                    <div key={`${srow.topic}-${i}`} className="space-y-1">
-                      <ProductFamilyLine catalog={catalog} systemKey={srow.system_key} />
-                      {srow.vendor_code && (
-                        <div className="text-[10px] text-muted-foreground">Vendor: {vendorBadge(catalog, srow.vendor_code)}</div>
-                      )}
-                      <div>
-                        <span className="text-muted-foreground">{srow.event_count ?? 0} events</span> —{' '}
-                        <code className="text-[10px] break-all">{srow.topic}</code>
-                      </div>
-                      <a href={href} className="text-primary text-[10px] break-all" target="_blank" rel="noreferrer">
-                        {href}
-                      </a>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-muted-foreground">Enable Stream delivery for a family, then Generate.</p>
-              )}
+            <CardContent className="px-3 pb-4 pt-3 flex-1 overflow-y-auto max-h-[min(50vh,420px)]">
+              <TelcoBackboneStreamsTable
+                catalog={catalog}
+                streams={summary?.streams ?? []}
+                apiBase={apiBase}
+                onPreviewStream={openArtifactPreview}
+              />
             </CardContent>
           </Card>
         </div>
@@ -688,6 +556,13 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
           service={simulatorService}
         />
       )}
+
+      <TelcoBackboneArtifactPreviewDialog
+        open={artifactPreviewOpen}
+        onOpenChange={setArtifactPreviewOpen}
+        target={artifactPreview}
+        apiBase={apiBase}
+      />
 
       {lastGenerate && (
         <details className="text-xs border rounded-md p-3 bg-muted/30">
