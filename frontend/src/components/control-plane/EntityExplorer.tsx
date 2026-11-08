@@ -21,7 +21,7 @@ import { virtualQueryService } from '@/services/virtualQueryService';
 import { mappingRuleService, type MappingRule } from '@/services/mappingRuleService';
 import type { QueryRequest } from '@/types/fdwTypes';
 
-const FDW_SCHEMA = 'sfdc_itxp2dev';
+const FDW_SCHEMA = 'sfdc_schema';
 
 interface SchemaEntity {
   name: string;

@@ -15,7 +15,9 @@ from ...connector_runtime import (
 
 router = APIRouter(prefix="/api/v1/simulator/sfdc", tags=["SFDC Connector"])
 
-SCHEMA = "sfdc_itxp2dev"
+from nexus_simulator.plugins.sfdc.schema import SFDC_SCHEMA
+
+SCHEMA = SFDC_SCHEMA
 
 
 class CreditHoldUpdate(BaseModel):

@@ -42,7 +42,7 @@ SCALE_FACTORS = {
     "large": 4.0,
 }
 
-SFDC_SCHEMA = "sfdc_itxp2dev"
+SFDC_SCHEMA = "sfdc_schema"
 SAP_SCHEMA = "sap_s4hana"
 ORACLE_SCHEMA = "oracle_erp"
 

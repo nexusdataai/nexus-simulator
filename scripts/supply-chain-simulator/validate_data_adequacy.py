@@ -30,7 +30,7 @@ except ImportError:
 SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "enterprise-knowledge" / "supply-chain-schema.yaml"
 
 SYSTEM_SCHEMA_MAP = {
-    "Salesforce": "sfdc_itxp2dev",
+    "Salesforce": "sfdc_schema",
     "SAP": "sap_s4hana",
     "Oracle": "oracle_erp",
     "Google_Drive": "external_sources",

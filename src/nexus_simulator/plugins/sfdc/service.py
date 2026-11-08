@@ -21,6 +21,8 @@ except ImportError:
     BOTO3_AVAILABLE = False
 
 from ...base import BaseSimulator as BaseSimulatorService
+from ...models.fdw import ForeignTableInfo
+from .schema import LEGACY_SFDC_SCHEMAS, SFDC_SCHEMA
 
 sim_logger = logger.bind(component="sfdc-simulator")
 
@@ -70,7 +72,7 @@ class SFDCSimulatorService(BaseSimulatorService):
         _r.seed(42)
         sim_logger.info("Seeding SFDC simulator data")
 
-        SCHEMA = "sfdc_itxp2dev"
+        SCHEMA = SFDC_SCHEMA
         SERVER = "sfdc_simulator"
         data_map: dict[str, list[dict]] = {}
 
@@ -167,6 +169,43 @@ class SFDCSimulatorService(BaseSimulatorService):
 
         return await self._finalize_seed(SCHEMA, SERVER, data_map)
 
+    async def load_from_s3(self) -> dict[str, Any]:
+        result = await super().load_from_s3()
+        if result.get("success"):
+            await self._canonicalize_sfdc_schema()
+        return result
+
+    async def _canonicalize_sfdc_schema(self) -> None:
+        """Rewrite legacy schema names from older S3 dumps to SFDC_SCHEMA."""
+        canonical = SFDC_SCHEMA
+        for legacy in LEGACY_SFDC_SCHEMAS:
+            if legacy == canonical:
+                continue
+            for key in list(self._columns.keys()):
+                schema, tname = key
+                if schema == legacy:
+                    self._columns[(canonical, tname)] = self._columns.pop(key)
+            new_tables: list[ForeignTableInfo] = []
+            for t in self._tables:
+                if t.schema_name != legacy:
+                    new_tables.append(t)
+                    continue
+                rows = await self._get_table_data(legacy, t.table_name)
+                await self._store_table(canonical, t.table_name, rows)
+                await self.cache.delete(self._redis_key(legacy, t.table_name))
+                await self.cache.delete(self._redis_count_key(legacy, t.table_name))
+                new_tables.append(
+                    ForeignTableInfo(
+                        schema_name=canonical,
+                        table_name=t.table_name,
+                        server_name=t.server_name,
+                        column_count=t.column_count,
+                    )
+                )
+            self._tables = new_tables
+            if self._manifest.get("schema") == legacy:
+                self._manifest["schema"] = canonical
+
     # ─── Dump status (S3-backed for multi-pod consistency) ──────────────
 
     def _set_dump_status(self, running: bool, result: dict[str, Any] | None = None,
@@ -196,7 +235,7 @@ class SFDCSimulatorService(BaseSimulatorService):
             return {"running": False, "result": None}
         return data
 
-    async def dump_from_live_fdw(self, source_url: str, schema: str = "sfdc_itxp2dev",
+    async def dump_from_live_fdw(self, source_url: str, schema: str = SFDC_SCHEMA,
                                   tables: list[str] | None = None, dump_all: bool = False,
                                   limit: int = 10000) -> dict[str, Any]:
         """Query a live FDW runtime and dump metadata + data to S3."""

@@ -18,7 +18,7 @@ export function SFDCDumpSection() {
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [sourceUrl, setSourceUrl] = useState('');
-  const [schema, setSchema] = useState('sfdc_itxp2dev');
+  const [schema, setSchema] = useState('sfdc_schema');
   const [tables, setTables] = useState('Account,Lead,Opportunity');
   const [limit, setLimit] = useState('10000');
   const [dumpAll, setDumpAll] = useState(false);
@@ -106,7 +106,7 @@ export function SFDCDumpSection() {
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Schema</label>
-              <Input placeholder="sfdc_itxp2dev" value={schema} onChange={e => setSchema(e.target.value)} className="mt-1" />
+              <Input placeholder="sfdc_schema" value={schema} onChange={e => setSchema(e.target.value)} className="mt-1" />
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Tables (comma-separated, or leave empty)</label>

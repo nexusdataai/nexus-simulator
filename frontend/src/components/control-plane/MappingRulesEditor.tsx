@@ -76,7 +76,7 @@ function normalize(s: string): string {
 function getSourceParam(schema: string): string | undefined {
   if (schema === 'oracle_erp') return 'oracle';
   if (schema === 'sap_s4hana') return 'sap';
-  if (schema === 'sfdc_itxp2dev') return 'simulator';
+  if (schema === 'sfdc_schema' || schema === 'sfdc_itxp2dev') return 'simulator';
   if (schema === 'external_sources') return 'external';
   return undefined;
 }

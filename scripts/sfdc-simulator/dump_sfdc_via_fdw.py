@@ -53,7 +53,7 @@ PRIORITY_TABLES = [
     "Note",
 ]
 
-DEFAULT_SCHEMA = "sfdc_itxp2dev"
+DEFAULT_SCHEMA = "sfdc_schema"
 DEFAULT_PREFIX = "sfdc-simulator"
 DEFAULT_LIMIT = 10000
 

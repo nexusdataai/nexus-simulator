@@ -21,7 +21,9 @@ _SOQL = re.compile(
 
 
 def _schema(svc) -> str:
-    return schema_for(svc, "sfdc_itxp2dev")
+    from nexus_simulator.plugins.sfdc.schema import SFDC_SCHEMA
+
+    return schema_for(svc, SFDC_SCHEMA)
 
 
 @router.get("/services/data")

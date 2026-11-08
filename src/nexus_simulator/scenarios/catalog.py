@@ -11,7 +11,7 @@ import yaml
 CATALOG_DIR = Path(__file__).resolve().parent / "catalog"
 
 PLUGIN_FALLBACK_SCHEMA = {
-    "sfdc": "sfdc_itxp2dev",
+    "sfdc": "sfdc_schema",
     "oracle": "oracle_erp",
     "sap": "sap_s4hana",
     "external": "external_sources",

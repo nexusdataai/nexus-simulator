@@ -51,7 +51,7 @@ class ObjectRecordsResponse(BaseModel):
 class DumpRequest(BaseModel):
     """Request to dump data from a live FDW runtime to S3."""
     source_url: str = Field(..., description="ALB URL of the live FDW runtime")
-    schema: str = Field(default="sfdc_itxp2dev", description="Schema to dump")
+    schema: str = Field(default="sfdc_schema", description="Schema to dump")
     tables: list[str] | None = Field(default=None, description="Specific tables to dump data for")
     dump_all: bool = Field(default=False, description="Dump data for ALL tables")
     limit: int = Field(default=10000, ge=1, le=100000, description="Max rows per table")
