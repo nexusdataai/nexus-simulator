@@ -4,6 +4,13 @@ import { cn } from '@/lib/utils';
 const MODES = ['Table', 'File', 'API', 'Stream'] as const;
 export type DeliveryTab = (typeof MODES)[number];
 
+const MODE_LABELS: Record<DeliveryTab, string> = {
+  Table: 'Table Data',
+  File: 'File',
+  API: 'API',
+  Stream: 'Stream',
+};
+
 type Counts = Partial<Record<Lowercase<DeliveryTab>, number>>;
 
 type Props = {
@@ -54,7 +61,7 @@ export function SimulatorDeliveryTabs({
                   : 'border-transparent bg-muted/50 text-muted-foreground hover:text-foreground',
               )}
             >
-              {mode}
+              {MODE_LABELS[mode]}
               {n !== undefined ? <span className="ml-1.5 text-[10px] opacity-80">({n})</span> : null}
             </button>
           );

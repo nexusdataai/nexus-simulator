@@ -59,7 +59,7 @@ type BackboneSummary = {
 interface Props {
   /** e.g. '/api/v1/bss-simulator' */
   apiBase: string;
-  /** When set, Tables pane lists FDW objects like the legacy panel (click row for data preview). */
+  /** When set, Table Data pane lists atlas tables (click row for data preview). */
   simulatorService?: CPQSimulatorService;
   simulatorTitle?: string;
   simulatorSubtitle?: string;
@@ -518,9 +518,9 @@ export function TelcoBackbonePanel({ apiBase, simulatorService, simulatorTitle, 
                       isLoading={loadingFdwObjects}
                       error={fdwObjectsError}
                       onSelectObject={handleSelectAtlasTable}
-                      title={`Atlas tables (${atlasSchema})`}
-                      emptyMessage={`No tables in ${atlasSchema} yet. Configure backbone with Table delivery and Generate.`}
-                      filterPlaceholder={`Filter ${atlasSchema} tables...`}
+                      title={`Table Data (${atlasSchema})`}
+                      emptyMessage={`No table data in ${atlasSchema} yet. Configure backbone with Table delivery and Generate.`}
+                      filterPlaceholder={`Filter table data in ${atlasSchema}...`}
                     />
                   ) : (
                     <p className="text-muted-foreground text-[11px] px-2">Table browser unavailable.</p>

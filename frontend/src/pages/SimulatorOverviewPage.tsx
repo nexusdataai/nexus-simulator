@@ -82,7 +82,7 @@ export default function SimulatorOverviewPage() {
         <div>
           <h2 className="text-xl font-semibold">Enterprise Data Simulators</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            FDW-compatible replicas hosted by nexus-simulator. Grouped by domain: supply chain vs telecom.
+            Enterprise table replicas hosted by nexus-simulator. Grouped by domain: supply chain vs telecom.
           </p>
         </div>
         {error && <div className="text-sm text-destructive">Failed to load catalog: {error}</div>}

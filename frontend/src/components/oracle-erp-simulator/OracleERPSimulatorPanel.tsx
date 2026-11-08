@@ -188,7 +188,7 @@ export function OracleERPSimulatorPanel() {
             onSelectObject={handleSelectObject}
           />
         }
-        files={<ArtifactModalityEmpty modality="File" hint="Oracle ERP simulator loads FDW table data from S3." />}
+        files={<ArtifactModalityEmpty modality="File" hint="Oracle ERP simulator loads table data from S3." />}
         apis={<ArtifactModalityEmpty modality="API" />}
         streams={<ArtifactModalityEmpty modality="Stream" />}
       />

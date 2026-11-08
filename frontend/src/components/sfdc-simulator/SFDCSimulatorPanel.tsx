@@ -173,7 +173,7 @@ export function SFDCSimulatorPanel() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Salesforce Simulator</h1>
-          <p className="text-sm text-muted-foreground">Manage in-memory FDW simulator data for testing</p>
+          <p className="text-sm text-muted-foreground">Manage in-memory table data for testing</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={refreshAll} disabled={state.loadingStatus}>
@@ -236,7 +236,7 @@ export function SFDCSimulatorPanel() {
         files={
           <ArtifactModalityEmpty
             modality="File"
-            hint="Salesforce simulator loads FDW table data from S3; file exports are not part of this plugin."
+            hint="Salesforce simulator loads table data from S3; file exports are not part of this plugin."
           />
         }
         apis={

@@ -10,7 +10,7 @@ export interface SAPObjectsTableProps {
   isLoading: boolean;
   error: string | null;
   onSelectObject: (schema: string, table: string) => void;
-  /** Card title (default: FDW Objects) */
+  /** Card title (default: Table Data) */
   title?: string;
   emptyMessage?: string;
   filterPlaceholder?: string;
@@ -23,9 +23,9 @@ export function SAPObjectsTable({
   isLoading,
   error,
   onSelectObject,
-  title = 'FDW Objects',
+  title = 'Table Data',
   emptyMessage = 'No objects loaded. Click "Load Data" to load from S3.',
-  filterPlaceholder = 'Filter tables...',
+  filterPlaceholder = 'Filter table data...',
 }: SAPObjectsTableProps) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('tableName');

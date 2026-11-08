@@ -188,7 +188,7 @@ export function SAPSimulatorPanel() {
             onSelectObject={handleSelectObject}
           />
         }
-        files={<ArtifactModalityEmpty modality="File" hint="SAP simulator persists FDW tables from S3; file artifacts are not generated here." />}
+        files={<ArtifactModalityEmpty modality="File" hint="SAP simulator persists table data from S3; file artifacts are not generated here." />}
         apis={<ArtifactModalityEmpty modality="API" />}
         streams={<ArtifactModalityEmpty modality="Stream" />}
       />

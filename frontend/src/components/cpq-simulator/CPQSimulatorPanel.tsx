@@ -108,7 +108,7 @@ export function CPQSimulatorPanel({ service, title, subtitle }: Props) {
             onSelectObject={handleSelectObject}
           />
         }
-        files={<ArtifactModalityEmpty modality="File" hint="CPQ simulators seed FDW tables; file exports use telecom backbone." />}
+        files={<ArtifactModalityEmpty modality="File" hint="CPQ simulators seed table data; file exports use telecom backbone." />}
         apis={<ArtifactModalityEmpty modality="API" />}
         streams={<ArtifactModalityEmpty modality="Stream" />}
       />

@@ -39,7 +39,7 @@ export function SFDCObjectsTable({ objects, isLoading, error, onSelectObject }: 
   if (isLoading) {
     return (
       <Card>
-        <CardHeader><CardTitle className="text-lg">FDW Objects</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-lg">Table Data</CardTitle></CardHeader>
         <CardContent><div className="space-y-2">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 rounded" />)}</div></CardContent>
       </Card>
     );
@@ -48,7 +48,7 @@ export function SFDCObjectsTable({ objects, isLoading, error, onSelectObject }: 
   if (error) {
     return (
       <Card>
-        <CardHeader><CardTitle className="text-lg">FDW Objects</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-lg">Table Data</CardTitle></CardHeader>
         <CardContent>
           <div className="flex flex-col items-center py-6 text-center">
             <AlertTriangle className="h-8 w-8 text-yellow-500 mb-2" />
@@ -64,13 +64,13 @@ export function SFDCObjectsTable({ objects, isLoading, error, onSelectObject }: 
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div className="flex items-center gap-2">
           <TableProperties className="h-5 w-5 text-muted-foreground" />
-          <CardTitle className="text-lg">FDW Objects</CardTitle>
+          <CardTitle className="text-lg">Table Data</CardTitle>
           <span className="text-xs text-muted-foreground">({filtered.length})</span>
         </div>
         <div className="relative w-56">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Filter tables..."
+            placeholder="Filter table data..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-8 h-9 text-sm"
