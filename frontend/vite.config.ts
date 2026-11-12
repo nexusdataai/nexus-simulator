@@ -1,38 +1,26 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
+import { defineConfig, loadEnv } from "vite";
+import react from "@vitejs/plugin-react";
 import path from "path";
 
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-    proxy: {
-      '/api': { target: 'http://localhost:8000', changeOrigin: true },
-      '/services': { target: 'http://localhost:8000', changeOrigin: true },
-      '/fscmRestApi': { target: 'http://localhost:8000', changeOrigin: true },
-      '/sap': { target: 'http://localhost:8000', changeOrigin: true },
-      '/health': { target: 'http://localhost:8000', changeOrigin: true },
-      '/stats': { target: 'http://localhost:8000', changeOrigin: true },
-      '/tools': { target: 'http://localhost:8000', changeOrigin: true },
-      '/journeys': { target: 'http://localhost:8000', changeOrigin: true },
-      '/docs': {
-        target: 'http://localhost:8001',
-        rewrite: (path) => path.replace(/^\/docs/, ''),
-      },
-      '/test': {
-        target: 'https://d37vwg02pj6oqg.cloudfront.net',
-        changeOrigin: true,
-        secure: true,
-        rewrite: (path) => path.replace(/^\/test/, ''),
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  // Development: forward API calls to a running nexus-simulator backend.
+  // Set VITE_PROXY_TARGET in .env.local (default: local backend on :8000).
+  const target = env.VITE_PROXY_TARGET || "http://localhost:8000";
+  const proxied = { target, changeOrigin: true, secure: true };
+
+  return {
+    server: {
+      host: "::",
+      port: 5390,
+      // "^/api/" (not "/api") so the /apis page is not sent to the backend.
+      proxy: {
+        "^/api/": proxied, "^/health$": proxied, "^/readiness$": proxied,
+        // Vendor-style API roots used by the API test bench.
+        "^/services/": proxied, "^/fscmRestApi/": proxied, "^/sap/": proxied,
       },
     },
-  },
-  plugins: [
-    react(),
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-}));
+    plugins: [react()],
+    resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  };
+});

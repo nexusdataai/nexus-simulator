@@ -1,86 +1,45 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect } from "react";
-import { ThemeProvider } from "./hooks/use-theme";
-import { EnterpriseAuthProvider, useEnterpriseAuth } from "./context/EnterpriseAuthContext";
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { Toaster } from 'sonner';
+import { ThemeProvider, useTheme } from '@/hooks/use-theme';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { ConfirmHost } from '@/components/ds/confirm';
+import Layout from '@/components/Layout';
+import OverviewPage from '@/pages/OverviewPage';
+import SystemsPage from '@/pages/SystemsPage';
+import ScenariosPage from '@/pages/ScenariosPage';
+import TablesPage from '@/pages/TablesPage';
+import ApisPage from '@/pages/ApisPage';
+import SettingsPage from '@/pages/SettingsPage';
+import NotFoundPage from '@/pages/NotFoundPage';
 
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import AuthCallback from "./pages/AuthCallback";
-import NotFound from "./pages/NotFound";
-import SimulatorsPage from "./pages/SimulatorsPage";
-import SimulatorOverviewPage from "./pages/SimulatorOverviewPage";
-import SimulatorTablesPage from "./pages/SimulatorTablesPage";
-import SimulatorApisPage from "./pages/SimulatorApisPage";
-import SimulatorScenariosPage from "./pages/SimulatorScenariosPage";
-import SimulatorSettingsPage from "./pages/SimulatorSettingsPage";
+function Toasts() {
+  const { theme } = useTheme();
+  return <Toaster theme={theme} position="bottom-right" closeButton toastOptions={{ className: 'font-sans' }} />;
+}
 
-const queryClient = new QueryClient();
-
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useEnterpriseAuth();
-  if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
-  if (!user) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-};
-
-const P = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute>{children}</ProtectedRoute>
-);
-
-const AuthRoutes = () => {
-  const { user, loading } = useEnterpriseAuth();
-
-  if (user && !loading && (window.location.pathname === "/login" || window.location.pathname === "/signup")) {
-    return <Navigate to="/" replace />;
-  }
-
-  return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
-
-      <Route path="/" element={<P><SimulatorOverviewPage /></P>} />
-      <Route path="/simulators" element={<P><SimulatorsPage /></P>} />
-      <Route path="/simulators/:id" element={<P><SimulatorsPage /></P>} />
-      <Route path="/operations/simulators" element={<Navigate to="/simulators" replace />} />
-      <Route path="/scenarios" element={<P><SimulatorScenariosPage /></P>} />
-      <Route path="/tables" element={<P><SimulatorTablesPage /></P>} />
-      <Route path="/apis" element={<P><SimulatorApisPage /></P>} />
-      <Route path="/settings" element={<P><SimulatorSettingsPage /></P>} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-};
-
-const App = () => {
-  useEffect(() => {
-    const old = localStorage.getItem("theme");
-    if (old) {
-      localStorage.setItem("app-theme", old);
-      localStorage.removeItem("theme");
-    }
-  }, []);
-
+/** Same routes as the previous front end, so existing links keep working. */
+export default function App() {
   return (
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <EnterpriseAuthProvider>
-              <AuthRoutes />
-            </EnterpriseAuthProvider>
-          </BrowserRouter>
-        </TooltipProvider>
-      </QueryClientProvider>
+      <TooltipProvider delayDuration={200}>
+        <BrowserRouter>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<OverviewPage />} />
+              <Route path="/simulators" element={<SystemsPage />} />
+              <Route path="/simulators/:id" element={<SystemsPage />} />
+              <Route path="/operations/simulators" element={<Navigate to="/simulators" replace />} />
+              <Route path="/scenarios" element={<ScenariosPage />} />
+              <Route path="/tables" element={<TablesPage />} />
+              <Route path="/apis" element={<ApisPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </Layout>
+          <ConfirmHost />
+          <Toasts />
+        </BrowserRouter>
+      </TooltipProvider>
     </ThemeProvider>
   );
-};
-
-export default App;
+}

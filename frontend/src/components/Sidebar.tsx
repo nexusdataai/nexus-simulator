@@ -1,106 +1,137 @@
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import { ChevronLeft, Database, GitBranch, Layers, Settings, Table2, Plug } from "lucide-react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { cn } from '@/core/utils';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { NAV_GROUPS, SETTINGS_ITEM, isNavItemActive, type NavItem } from '@/config/navigation';
+import { Logo } from '@/components/ds/Logo';
+import { Icon, type IconName } from '@/components/ds/Icon';
 
-const MENU = [
-  {
-    label: "SIMULATORS",
-    items: [
-      { id: "home", name: "Overview", icon: Layers, path: "/" },
-      { id: "systems", name: "Systems", icon: Database, path: "/simulators" },
-      { id: "scenarios", name: "Scenarios", icon: GitBranch, path: "/scenarios" },
-      { id: "tables", name: "Tables", icon: Table2, path: "/tables" },
-      { id: "apis", name: "APIs", icon: Plug, path: "/apis" },
-    ],
-  },
-];
+const MINI_KEY = 'nexus-simulator-sidebar-mini';
 
-const Sidebar = () => {
+
+interface SidebarNavProps {
+  /** Icon-only rail. */
+  mini?: boolean;
+  /** Called after a navigation (used to close the mobile drawer). */
+  onNavigate?: () => void;
+}
+
+const rowBase =
+  'group flex h-8 w-full items-center rounded-md text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+const rowIdle = 'text-sidebar-foreground hover:bg-accent/70 hover:text-foreground';
+const rowActive = 'bg-accent font-medium text-foreground';
+
+/** Wraps a row in a tooltip when the sidebar is collapsed to icons. */
+function MiniTip({ label, mini, children }: { label: string; mini?: boolean; children: React.ReactElement }) {
+  if (!mini) return children;
+  return (
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="right" sideOffset={10}>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+/**
+ * Navigation content. Rendered inside the desktop rail and the mobile drawer.
+ */
+export function SidebarNav({ mini, onNavigate }: SidebarNavProps) {
   const nav = useNavigate();
   const loc = useLocation();
-  const [mini, setMini] = useState(false);
-  const active = (p: string) => {
-    if (p === "/") return loc.pathname === "/";
-    return loc.pathname === p || loc.pathname.startsWith(p + "/");
+  const go = (path: string) => {
+    nav(path);
+    onNavigate?.();
+  };
+
+  const layout = mini ? 'justify-center' : 'gap-2.5 px-2';
+  const iconCls = (on: boolean) => cn('h-[17px] w-[17px] transition-colors', on ? 'text-primary dark:text-brand-hi' : 'text-subtle-foreground group-hover:text-foreground');
+
+  const renderItem = (item: NavItem) => {
+    const on = isNavItemActive(item, loc.pathname);
+    return (
+      <MiniTip key={item.id} label={item.name} mini={mini}>
+        <button
+          type="button"
+          onClick={() => go(item.path)}
+          aria-current={on ? 'page' : undefined}
+          aria-label={mini ? item.name : undefined}
+          className={cn(rowBase, layout, on ? rowActive : rowIdle)}
+        >
+          <Icon name={item.icon} className={iconCls(on)} />
+          {!mini && <span className="truncate">{item.name}</span>}
+        </button>
+      </MiniTip>
+    );
   };
 
   return (
-    <aside
-      className={cn(
-        "h-full flex flex-col shrink-0 transition-all duration-200 border-r relative",
-        "bg-slate-100 dark:bg-[#141b2d] border-slate-200 dark:border-[#1e2740]",
-        mini ? "w-14" : "w-[190px]",
-      )}
-    >
-      <div className={cn("flex items-center gap-2 px-3 pt-4 pb-3", mini && "justify-center px-2")}>
-        <div className="w-7 h-7 rounded-md bg-violet-600 text-white text-xs font-bold flex items-center justify-center shrink-0">
-          NS
-        </div>
-        {!mini && (
-          <div className="min-w-0">
-            <div className="text-sm font-semibold truncate">Nexus Simulator</div>
-            <div className="text-[10px] text-muted-foreground truncate">Enterprise data replicas</div>
-          </div>
-        )}
-      </div>
-
-      <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-4">
-        {MENU.map((section) => (
-          <div key={section.label}>
-            {!mini && (
-              <div className="px-2 mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground">
-                {section.label}
-              </div>
-            )}
-            <div className="space-y-0.5">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const isActive = active(item.path);
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => nav(item.path)}
-                    className={cn(
-                      "w-full flex items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors",
-                      isActive
-                        ? "bg-violet-600/15 text-violet-700 dark:text-violet-300"
-                        : "text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800",
-                      mini && "justify-center px-0",
-                    )}
-                    title={item.name}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    {!mini && <span className="truncate">{item.name}</span>}
-                  </button>
-                );
-              })}
+    <div className="flex h-full min-h-0 flex-col">
+      <nav aria-label="Main" className={cn('scrollbar-hide min-h-0 flex-1 overflow-y-auto pb-3', mini ? 'px-2' : 'px-3')}>
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={group.label} className={cn(gi > 0 && 'mt-5')}>
+            {mini
+              ? gi > 0 && <div className="mx-1.5 mb-3 border-t border-sidebar-border" />
+              : <div className="eyebrow px-2 pb-1.5">{group.label}</div>}
+            <div className="space-y-px">
+              {group.items.map(renderItem)}
             </div>
           </div>
         ))}
       </nav>
 
-      <div className="p-2 border-t border-slate-200 dark:border-[#1e2740]">
-        <button
-          onClick={() => nav("/settings")}
-          className={cn(
-            "w-full flex items-center gap-2 rounded-md px-2 py-2 text-sm",
-            active("/settings")
-              ? "bg-violet-600/15 text-violet-700 dark:text-violet-300"
-              : "text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800",
-            mini && "justify-center px-0",
-          )}
-        >
-          <Settings className="h-4 w-4" />
-          {!mini && <span>Settings</span>}
-        </button>
-        <button
-          onClick={() => setMini((v) => !v)}
-          className="mt-1 w-full flex items-center justify-center rounded-md py-1 text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className={cn("h-4 w-4 transition-transform", mini && "rotate-180")} />
-        </button>
+      <div className={cn('space-y-px border-t border-sidebar-border py-2.5', mini ? 'px-2' : 'px-3')}>
+        {renderItem(SETTINGS_ITEM)}
       </div>
+    </div>
+  );
+}
+
+/** Desktop sidebar rail. Hidden below the lg breakpoint (see MobileNav). */
+const Sidebar = () => {
+  const nav = useNavigate();
+  const [mini, setMini] = useState(() => localStorage.getItem(MINI_KEY) === '1');
+
+  useEffect(() => {
+    localStorage.setItem(MINI_KEY, mini ? '1' : '0');
+  }, [mini]);
+
+  return (
+    <aside
+      className={cn(
+        'relative hidden h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-300 ease-brand-out lg:flex',
+        mini ? 'w-[var(--sidebar-w-mini)]' : 'w-[var(--sidebar-w)]',
+      )}
+    >
+      <div className={cn('flex h-[var(--topbar-h)] shrink-0 items-center', mini ? 'justify-center px-2' : 'justify-between pl-5 pr-2.5')}>
+        <button type="button" onClick={() => nav('/')} aria-label="Simulator overview" className="rounded-md">
+          <Logo markOnly={mini} product="Simulator" />
+        </button>
+        {!mini && (
+          <button
+            type="button"
+            onClick={() => setMini(true)}
+            aria-label="Collapse sidebar"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-subtle-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Icon name="chevron-left" />
+          </button>
+        )}
+      </div>
+
+      <div className="min-h-0 flex-1 pt-3">
+        <SidebarNav mini={mini} />
+      </div>
+
+      {mini && (
+        <button
+          type="button"
+          onClick={() => setMini(false)}
+          aria-label="Expand sidebar"
+          className="absolute -right-3 top-[14px] z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border-strong bg-card text-muted-foreground shadow-xs transition-colors hover:text-foreground"
+        >
+          <Icon name="chevron-right" className="h-3.5 w-3.5" />
+        </button>
+      )}
     </aside>
   );
 };

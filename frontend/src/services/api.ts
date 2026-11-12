@@ -1,218 +1,296 @@
+/**
+ * All calls to the nexus-simulator backend live here. Screens never call
+ * fetch directly, so a change in the API is a change in one file.
+ *
+ * The API base comes from /config.json (api.baseUrl), the same file the
+ * previous front end read, so deployment does not change.
+ */
 
-import { supabase } from '@/integrations/supabase/client';
-import { Product, Order, Analytics, Customer, OrderItem } from '@/types/database.types';
+/* ------------------------------------------------------------------ types */
 
-// Products related functions
-export const getProducts = async (): Promise<Product[]> => {
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .order('name');
+export interface SimStatus {
+  service?: string;
+  enabled: boolean;
+  loaded: boolean;
+  bucket?: string;
+  prefix?: string;
+  table_data_prefix?: string;
+  files_data_prefix?: string;
+  schema?: string;
+  table_count: number;
+  tables_with_data: number;
+  total_rows: number;
+  file_count: number;
+  api_count: number;
+  stream_count: number;
+  dump_timestamp?: string | null;
+  last_loaded?: string | null;
+  backbone_run_id?: string | null;
+  backbone_generated_at?: string | null;
+  vendor_label?: string | null;
+  vendor_code?: string | null;
+}
 
-  if (error) {
-    console.error('Error fetching products:', error);
-    throw error;
+export interface TableRef {
+  schemaName: string;
+  tableName: string;
+  columnCount?: number | null;
+  rowCount?: number | null;
+}
+
+export interface CatalogTable extends TableRef {
+  /** Backend service key ("sfdc", "oracle", ...). */
+  service: string;
+}
+
+export interface TableRows {
+  rows: Record<string, unknown>[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface TableColumn {
+  columnName: string;
+  dataType: string;
+  isNullable?: boolean;
+  ordinalPosition?: number;
+}
+
+export interface BackboneSystem { system_key: string; slug?: string; deliveries: string[] }
+export interface BackboneCatalog {
+  layer: string;
+  vendors: Record<string, string>;
+  vendor_default: string;
+  systems: BackboneSystem[];
+}
+export interface BackboneFile { name?: string; path?: string; system_key?: string | null; vendor_code?: string | null }
+export interface BackboneApi { method?: string; route_path?: string; system_key?: string | null; vendor_code?: string | null }
+export interface BackboneStream { topic?: string; event_count?: number; system_key?: string | null; vendor_code?: string | null }
+export interface BackboneSummary {
+  layer?: string;
+  run_id?: string | null;
+  generated_at?: string | null;
+  vendor_code?: string | null;
+  vendor_label?: string | null;
+  tables?: { schema: string; table: string; rows: number }[];
+  files?: BackboneFile[];
+  apis?: BackboneApi[];
+  streams?: BackboneStream[];
+}
+
+export interface ScenarioStep {
+  id: string;
+  title: string;
+  plugin: string;
+  tables: string[];
+  action: string;
+  index?: number;
+  /** Present on previewed steps: rows that would be added per table. */
+  planned?: Record<string, number>;
+}
+export interface Scenario {
+  id: string;
+  solutionId: string;
+  solutionTitle: string;
+  title: string;
+  summary?: string;
+  kpis: string[];
+  steps: ScenarioStep[];
+  plugins: string[];
+  stepCount: number;
+}
+export interface ScenarioWrite {
+  plugin: string;
+  pluginLabel?: string;
+  schema?: string;
+  table: string;
+  action?: string;
+  added?: number;
+  count?: number;
+  updated?: number;
+  deleted?: number;
+  beforeCount?: number | null;
+  afterCount?: number | null;
+  recordIds?: (string | number)[];
+}
+export interface ScenarioStepResult {
+  stepId: string;
+  message?: string;
+  written?: ScenarioWrite[];
+  bound?: { name: string; count: number; sample: unknown[] }[];
+}
+export interface ScenarioRun {
+  runId: string;
+  scenarioId: string;
+  status: string;
+  completedSteps?: string[];
+  results: ScenarioStepResult[];
+  summary?: { totalAdded: number; tablesTouched: number; tables: ScenarioWrite[]; reverted?: ScenarioWrite[] };
+  reverted?: ScenarioWrite[];
+}
+
+export interface VendorMethod { method: string; path: string; kind: string }
+export interface VendorApi {
+  id: string;
+  system: string;
+  name: string;
+  table: string;
+  schema: string;
+  rowCount: number;
+  columnCount?: number;
+  pk?: string;
+  docsUrl?: string;
+  methods: VendorMethod[];
+}
+
+/* ------------------------------------------------------------- transport */
+
+let basePromise: Promise<string> | null = null;
+
+function apiBase(): Promise<string> {
+  if (!basePromise) {
+    basePromise = fetch('/config.json', { cache: 'no-store', headers: { Accept: 'application/json' } })
+      .then(r => (r.ok ? r.json() : {}))
+      .then((c: any) => String(c?.api?.baseUrl || ''))
+      .catch(() => '');
   }
+  return basePromise;
+}
 
-  return data as Product[];
-};
-
-export const getProductById = async (id: string): Promise<Product> => {
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    console.error('Error fetching product:', error);
-    throw error;
+export class ApiError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
   }
+}
 
-  return data as Product;
-};
-
-export const getProductsByCategory = async (category: string): Promise<Product[]> => {
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .eq('category', category)
-    .order('name');
-
-  if (error) {
-    console.error('Error fetching products by category:', error);
-    throw error;
+async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 30000): Promise<T> {
+  const base = await apiBase();
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${base}${path}`, {
+      ...init,
+      signal: ctrl.signal,
+      headers: { Accept: 'application/json', ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...init.headers },
+    });
+    const text = await res.text();
+    let body: any = null;
+    try { body = text ? JSON.parse(text) : null; } catch { body = null; }
+    if (!res.ok) {
+      if (res.status === 503) throw new ApiError('This simulator is switched off on the server.', 503);
+      const detail = body?.detail;
+      throw new ApiError(typeof detail === 'string' ? detail : `The server answered ${res.status} ${res.statusText}`.trim(), res.status);
+    }
+    if (body === null) throw new ApiError('The server did not return data for this request.', res.status);
+    return body as T;
+  } catch (e: any) {
+    if (e instanceof ApiError) throw e;
+    if (e?.name === 'AbortError') throw new ApiError('The request took too long. Please try again.');
+    throw new ApiError('Could not reach the simulator service. Check your connection and try again.');
+  } finally {
+    window.clearTimeout(timer);
   }
+}
 
-  return data as Product[];
-};
+const post = (body?: unknown): RequestInit => ({ method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
+const enc = encodeURIComponent;
+const LONG = 120000;
 
-// Orders related functions
-export const getUserOrders = async (): Promise<Order[]> => {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('*')
-    .order('created_at', { ascending: false });
+/** Full URL for links that open in a new tab (API routes, stream replay). */
+export async function absoluteUrl(path: string): Promise<string> {
+  return `${await apiBase()}${path}`;
+}
 
-  if (error) {
-    console.error('Error fetching orders:', error);
-    throw error;
-  }
+/* --------------------------------------------------------------- catalog */
 
-  return data as Order[];
-};
+export const listSimulators = () => request<{ total: number; items: SimStatus[] }>('/api/v1/simulators').then(r => r.items || []);
 
-export const getOrderById = async (id: string): Promise<Order> => {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('id', id)
-    .single();
+export const getSimulatorTables = (service: string) =>
+  request<SimStatus & { tables?: any[] }>(`/api/v1/simulators/${enc(service)}`).then(r =>
+    (r.tables || []).map((t): CatalogTable => ({
+      service,
+      schemaName: t.schemaName ?? t.schema,
+      tableName: t.tableName ?? t.table,
+      columnCount: t.columnCount ?? t.columns ?? null,
+      rowCount: t.rowCount ?? t.rows ?? null,
+    })),
+  );
 
-  if (error) {
-    console.error('Error fetching order:', error);
-    throw error;
-  }
+export const seedAllTelco = () => request<{ message?: string }>('/api/v1/telco/seed-all', post(), LONG);
 
-  return data as Order;
-};
+/* ------------------------------------------------------------ one system */
 
-export const getOrderItems = async (orderId: string) => {
-  const { data, error } = await supabase
-    .from('order_items')
-    .select(`
-      *,
-      products:product_id (
-        name,
-        price,
-        image_url
-      )
-    `)
-    .eq('order_id', orderId);
+export function systemApi(apiPath: string) {
+  return {
+    status: () => request<SimStatus>(`${apiPath}/status`),
+    load: () => request<any>(`${apiPath}/load`, post(), LONG),
+    seed: () => request<any>(`${apiPath}/seed`, post(), LONG),
+    reset: () => request<any>(`${apiPath}/reset`, post(), LONG),
+    objects: () => request<{ objects: TableRef[] }>(`${apiPath}/objects`).then(r => r.objects || []),
+    rows: (schema: string, table: string, limit = 50, offset = 0) =>
+      request<TableRows>(`${apiPath}/objects/${enc(schema)}/${enc(table)}?limit=${limit}&offset=${offset}`),
+    columns: (schema: string, table: string) =>
+      request<{ columns: TableColumn[] }>(`${apiPath}/objects/${enc(schema)}/${enc(table)}/columns`).then(r => r.columns || []),
 
-  if (error) {
-    console.error('Error fetching order items:', error);
-    throw error;
-  }
+    /* Telco AI Backbone (BSS / NSS / OSS only) */
+    backboneCatalog: () => request<BackboneCatalog>(`${apiPath}/backbone/catalog`),
+    backboneSummary: () => request<BackboneSummary>(`${apiPath}/backbone/summary`),
+    backboneStatus: () => request<SimStatus>(`${apiPath}/backbone/status`),
+    backboneGenerate: (body: unknown) => request<any>(`${apiPath}/backbone/generate`, post(body), LONG),
+    backboneStreamEvents: (topic: string) => request<{ events?: unknown[] }>(`${apiPath}/backbone/stream-events?topic=${enc(topic)}`).then(r => r.events || []),
+    backboneFile: async (path: string) => {
+      const res = await fetch(`${await apiBase()}${apiPath}/backbone/file?path=${enc(path)}`);
+      if (!res.ok) throw new ApiError(`Could not open the file (${res.status}).`, res.status);
+      return res.text();
+    },
+    vendorApiPath: (route: string) => `${apiPath}/vendor-api/${route.replace(/^\//, '')}`,
+    streamReplayPath: (topic: string) => `${apiPath}/backbone/stream/${enc(topic)}`,
+  };
+}
 
-  return data;
-};
+export type SystemApi = ReturnType<typeof systemApi>;
 
-// Analytics related functions
-export const getAnalyticsByCategoryAndDateRange = async (
-  startDate: string, 
-  endDate: string
-) => {
-  const { data, error } = await supabase
-    .from('analytics')
-    .select('*')
-    .gte('date', startDate)
-    .lte('date', endDate)
-    .order('date');
+/* -------------------------------------------------------------- scenarios */
 
-  if (error) {
-    console.error('Error fetching analytics:', error);
-    throw error;
-  }
+export const listScenarios = () =>
+  request<{ solutions: { id: string; title: string }[]; items: Scenario[] }>('/api/v1/scenarios');
 
-  return data as Analytics[];
-};
+export const previewScenario = (id: string) =>
+  request<{ steps: ScenarioStep[] }>(`/api/v1/scenarios/${enc(id)}/preview`, post({ limit: 10 })).then(r => r.steps || []);
 
-// Customers related functions
-export const getCustomers = async (): Promise<Customer[]> => {
-  const { data, error } = await supabase
-    .from('customers')
-    .select('*')
-    .order('name');
+export const runScenario = (id: string, body: { stepId?: string; runId?: string }) =>
+  request<ScenarioRun>(`/api/v1/scenarios/${enc(id)}/run`, post({ ...body, limit: 10 }), LONG);
 
-  if (error) {
-    console.error('Error fetching customers:', error);
-    throw error;
-  }
+export const revertScenarioRun = (runId: string) =>
+  request<ScenarioRun>(`/api/v1/scenarios/runs/${enc(runId)}/revert`, post(), LONG);
 
-  return data as Customer[];
-};
+/* ------------------------------------------------------------ vendor APIs */
 
-export const getCustomerById = async (id: string): Promise<Customer> => {
-  const { data, error } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('id', id)
-    .single();
+export const listVendorApis = (system: string) =>
+  request<{ items: VendorApi[] }>(`/api/v1/vendor-apis?system=${enc(system)}`, {}, 60000).then(r => r.items || []);
 
-  if (error) {
-    console.error('Error fetching customer:', error);
-    throw error;
-  }
+export const vendorApiSample = (id: string) =>
+  request<{ row?: Record<string, unknown> }>(`/api/v1/vendor-apis/${enc(id)}/sample`).then(r => r.row || {});
 
-  return data as Customer;
-};
+/** Send any request and return the raw outcome (used by the API test bench). */
+export async function sendRaw(path: string, method: string, body?: string): Promise<{ status: number; statusText: string; ok: boolean; text: string; ms: number }> {
+  const base = /^https?:/.test(path) ? '' : await apiBase();
+  const started = performance.now();
+  const res = await fetch(`${base}${path}`, {
+    method,
+    headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: ['GET', 'HEAD', 'DELETE'].includes(method) ? undefined : body,
+  });
+  const text = await res.text();
+  return { status: res.status, statusText: res.statusText, ok: res.ok, text, ms: Math.round(performance.now() - started) };
+}
 
-// Create a new customer
-export const createCustomer = async (customerData: Partial<Customer>): Promise<Customer> => {
-  const { data, error } = await supabase
-    .from('customers')
-    .insert([customerData])
-    .select()
-    .single();
+export const vendorBatch = (body: unknown) => sendRaw('/api/v1/vendor-apis/batch', 'POST', JSON.stringify(body));
 
-  if (error) {
-    console.error('Error creating customer:', error);
-    throw error;
-  }
+/* ---------------------------------------------------------------- service */
 
-  return data as Customer;
-};
-
-// Update a customer
-export const updateCustomer = async (id: string, customerData: Partial<Customer>): Promise<Customer> => {
-  const { data, error } = await supabase
-    .from('customers')
-    .update(customerData)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error updating customer:', error);
-    throw error;
-  }
-
-  return data as Customer;
-};
-
-// Create a new order
-export const createOrder = async (orderData: Partial<Order>, orderItems: Partial<OrderItem>[]): Promise<Order> => {
-  // Start a transaction
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert([orderData])
-    .select()
-    .single();
-
-  if (orderError) {
-    console.error('Error creating order:', orderError);
-    throw orderError;
-  }
-
-  if (!order) {
-    throw new Error('Failed to create order');
-  }
-
-  // Add order items with the new order ID
-  const itemsWithOrderId = orderItems.map(item => ({
-    ...item,
-    order_id: order.id
-  }));
-
-  const { error: itemsError } = await supabase
-    .from('order_items')
-    .insert(itemsWithOrderId);
-
-  if (itemsError) {
-    console.error('Error creating order items:', itemsError);
-    throw itemsError;
-  }
-
-  return order as Order;
-};
+export const getHealth = () => request<Record<string, unknown>>('/health');
+export const getReadiness = () => request<Record<string, unknown>>('/readiness');
