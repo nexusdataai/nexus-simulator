@@ -22,6 +22,8 @@ export interface SimulatorDef {
   actions: SimAction[];
   /** Telecom layers are generated from the Telco AI Backbone atlas. */
   backbone?: boolean;
+  /** Google Drive, social listening and uploads (not warehouse tables). */
+  artifacts?: boolean;
 }
 
 export const DOMAINS: { id: DomainId; title: string; description: string }[] = [
@@ -33,7 +35,7 @@ export const SIMULATORS: SimulatorDef[] = [
   { id: 'sfdc', service: 'sfdc', name: 'Salesforce', short: 'Salesforce', description: 'CRM objects: accounts, opportunities, campaigns and the full sObject catalog.', apiPath: '/api/v1/sfdc-simulator', domain: 'supply-chain', logo: 'salesforce', actions: ['load', 'reset'] },
   { id: 'oracle-erp', service: 'oracle', name: 'Oracle ERP', short: 'Oracle', description: 'Finance and operations: receivables, customers and purchase orders.', apiPath: '/api/v1/oracle-erp-simulator', domain: 'supply-chain', logo: 'oracle', actions: ['load', 'reset'] },
   { id: 'sap', service: 'sap', name: 'SAP S/4HANA', short: 'SAP', description: 'Supply chain operations: materials, deliveries, production and inventory.', apiPath: '/api/v1/sap-simulator', domain: 'supply-chain', logo: 'sap', actions: ['load', 'reset'] },
-  { id: 'external', service: 'external', name: 'External sources', short: 'External', description: 'Google Drive, social listening and file uploads in one simulator.', apiPath: '/api/v1/external-simulator', domain: 'supply-chain', logo: 'external', actions: ['seed', 'reset'] },
+  { id: 'external', service: 'external', name: 'External sources', short: 'External', description: 'Google Drive documents, social listening feeds and scanned uploads — before ontology mapping.', apiPath: '/api/v1/external-simulator', domain: 'supply-chain', logo: 'external', actions: ['seed', 'reset'], artifacts: true },
   { id: 'tpm', service: 'tpm', name: 'TPM (Trade CPQ)', short: 'TPM', description: 'Trade promotion management behind sell-side CPQ: quotes, offerings, price books and rules.', apiPath: '/api/v1/tpm-simulator', domain: 'supply-chain', logo: 'tpm', actions: ['seed', 'load', 'reset'] },
   { id: 'sourcing', service: 'sourcing', name: 'Sourcing (Buy CPQ)', short: 'Sourcing', description: 'SAP Ariba style sourcing behind buy-side CPQ: RFx events, vendor quotes and should-cost models.', apiPath: '/api/v1/sourcing-simulator', domain: 'supply-chain', logo: 'sourcing', actions: ['seed', 'load', 'reset'] },
   { id: 'bss', service: 'bss', name: 'BSS', short: 'BSS', description: 'Business support systems: CRM, billing, care, campaigns and number porting.', apiPath: '/api/v1/bss-simulator', domain: 'telecom', logo: 'bss', actions: [], backbone: true },

@@ -131,3 +131,22 @@ def test_load_status_route(client: TestClient) -> None:
     r = client.get("/api/v1/external-simulator/load/status")
     assert r.status_code == 200
     assert "running" in r.json()
+
+
+def test_sources_and_files_after_seed(client: TestClient) -> None:
+    r = client.get("/api/v1/external-simulator/sources")
+    assert r.status_code == 200
+    sources = {s["id"]: s for s in r.json()["sources"]}
+    assert sources["google_drive"]["file_count"] > 0
+    assert sources["social_listening"]["feed_count"] > 0
+    assert sources["file_uploads"]["file_count"] > 0
+
+    files = client.get("/api/v1/external-simulator/files?source=google_drive").json()["files"]
+    assert any("/contracts/" in f.get("path", "") for f in files)
+
+    social = client.get("/api/v1/external-simulator/social?limit=5").json()["items"]
+    assert len(social) == 5
+
+    st = client.get("/api/v1/external-simulator/status").json()
+    assert st["file_count"] > 0
+    assert st["social_item_count"] > 0

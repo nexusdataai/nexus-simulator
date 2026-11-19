@@ -29,6 +29,42 @@ export interface SimStatus {
   backbone_generated_at?: string | null;
   vendor_label?: string | null;
   vendor_code?: string | null;
+  /** External sources: feed item count (social listening). */
+  social_item_count?: number;
+  /** External sources: per-source counts (files or feed). */
+  source_counts?: Record<string, number>;
+  mapping_table_count?: number;
+}
+
+export interface ExternalSourceDef {
+  id: string;
+  name: string;
+  description: string;
+  file_count: number;
+  feed_count: number;
+}
+
+export interface ExternalArtifactFile {
+  name: string;
+  path: string;
+  source_id: string;
+  source_label?: string;
+  kind?: string;
+  table?: string;
+  id?: string;
+  size_kb?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface SocialFeedItem {
+  id: string;
+  source_id: string;
+  kind: string;
+  table?: string;
+  title: string;
+  summary: string;
+  timestamp?: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 export interface TableRef {
@@ -246,6 +282,18 @@ export function systemApi(apiPath: string) {
       if (!res.ok) throw new ApiError(`Could not open the file (${res.status}).`, res.status);
       return res.text();
     },
+
+    /** External sources (files + social feed). */
+    sources: () => request<{ sources: ExternalSourceDef[] }>(`${apiPath}/sources`).then(r => r.sources || []),
+    files: (source?: string) =>
+      request<{ files: ExternalArtifactFile[] }>(
+        `${apiPath}/files${source ? `?source=${enc(source)}` : ''}`,
+      ).then(r => r.files || []),
+    social: (limit = 100) =>
+      request<{ items: SocialFeedItem[] }>(`${apiPath}/social?limit=${limit}`).then(r => r.items || []),
+    filePreview: (path: string) =>
+      request<{ content: string }>(`${apiPath}/files/preview?path=${enc(path)}`).then(r => r.content || ''),
+
     vendorApiPath: (route: string) => `${apiPath}/vendor-api/${route.replace(/^\//, '')}`,
     streamReplayPath: (topic: string) => `${apiPath}/backbone/stream/${enc(topic)}`,
   };

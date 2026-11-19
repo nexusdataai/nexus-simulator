@@ -11,6 +11,7 @@ import { TableList, type TableListRow } from '@/components/sim/TableList';
 import { RowsSheet } from '@/components/sim/RowsSheet';
 import { SystemFacts, SystemHeader } from '@/components/sim/SystemHeader';
 import { BackbonePanel } from '@/components/sim/BackbonePanel';
+import { ExternalSourcesPanel } from '@/components/sim/ExternalSourcesPanel';
 import { DEFAULT_SIM, DOMAINS, SIMULATORS, simById, type SimAction, type SimulatorDef } from '@/config/simulators';
 import { useLoad } from '@/hooks/useLoad';
 import { compact, errorText } from '@/core/format';
@@ -172,7 +173,13 @@ export default function SystemsPage() {
 
       <div className="min-w-0 flex-1">
         <div className="page">
-          {sim.backbone ? <BackbonePanel key={sim.id} sim={sim} /> : <SystemPanel key={sim.id} sim={sim} />}
+          {sim.backbone ? (
+            <BackbonePanel key={sim.id} sim={sim} />
+          ) : sim.artifacts ? (
+            <ExternalSourcesPanel key={sim.id} sim={sim} api={systemApi(sim.apiPath)} />
+          ) : (
+            <SystemPanel key={sim.id} sim={sim} />
+          )}
         </div>
       </div>
     </div>

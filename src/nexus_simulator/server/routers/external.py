@@ -75,6 +75,36 @@ async def reset_data(request: Request):
     return {"success": True, "message": "Reset started. Poll GET /status for updates."}
 
 
+@router.get("/sources", tags=["External Simulator"])
+async def list_sources(request: Request):
+    service = get_service(request)
+    return {"sources": await service.get_sources_catalog()}
+
+
+@router.get("/files", tags=["External Simulator"])
+async def list_files(request: Request, source: str | None = Query(None)):
+    service = get_service(request)
+    if not service.loaded:
+        return {"files": [], "message": "Simulator not loaded. Seed data first."}
+    return {"files": await service.get_files_manifest(source)}
+
+
+@router.get("/files/preview", tags=["External Simulator"])
+async def preview_file(request: Request, path: str = Query(..., min_length=1)):
+    service = get_service(request)
+    if not service.loaded:
+        raise HTTPException(status_code=400, detail="Simulator not loaded.")
+    return await service.get_file_preview(path)
+
+
+@router.get("/social", tags=["External Simulator"])
+async def social_feed(request: Request, limit: int = Query(100, ge=1, le=500)):
+    service = get_service(request)
+    if not service.loaded:
+        return {"items": [], "message": "Simulator not loaded. Seed data first."}
+    return {"items": await service.get_social_feed(limit)}
+
+
 @router.get("/objects", tags=["External Simulator"])
 async def list_objects(request: Request):
     service = get_service(request)

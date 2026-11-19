@@ -41,6 +41,62 @@ TABLE_SYSTEM_MAP = {
     "Lab_Report_Upload": "File_Uploads",
 }
 
+SOURCE_SLUG = {
+    "Google_Drive": "google_drive",
+    "Social_Listening": "social_listening",
+    "File_Uploads": "file_uploads",
+}
+
+SOURCES: list[dict[str, str]] = [
+    {
+        "id": "google_drive",
+        "name": "Google Drive",
+        "description": "Contracts, sustainability reports and shared documents in Drive folders.",
+    },
+    {
+        "id": "social_listening",
+        "name": "Social listening",
+        "description": "Market signals, brand sentiment and commodity pricing from social and news feeds.",
+    },
+    {
+        "id": "file_uploads",
+        "name": "File uploads",
+        "description": "Invoices and lab reports uploaded for extraction and validation.",
+    },
+]
+
+FILE_TABLE_SPECS: dict[str, dict[str, Any]] = {
+    "Contract_Document": {"path_key": "Document_Path", "id_key": "Contract_ID", "kind": "contract"},
+    "Sustainability_Report": {"path_key": "Document_Path", "id_key": "Report_ID", "kind": "report"},
+    "ContentVersion": {"id_key": "ContentVersion_ID", "kind": "document", "synthetic_path": True},
+    "Invoice_Upload": {"path_key": "File_Path", "id_key": "Upload_ID", "kind": "invoice"},
+    "Lab_Report_Upload": {"path_key": "File_Path", "id_key": "Upload_ID", "kind": "lab_report"},
+}
+
+SOCIAL_TABLE_SPECS: dict[str, dict[str, Any]] = {
+    "Market_Signal": {
+        "kind": "market_signal",
+        "id_key": "Signal_ID",
+        "title": lambda r: f"{r.get('Event_Type', 'Signal')} — {r.get('Affected_Commodity', '')}".strip(" —"),
+        "summary": lambda r: f"{r.get('Severity', '')} · {r.get('Location', '')} · {r.get('Source', '')}".strip(),
+        "timestamp_key": "Timestamp",
+    },
+    "Brand_Sentiment": {
+        "kind": "brand_sentiment",
+        "id_key": "Sentiment_ID",
+        "title": lambda r: f"{r.get('Brand', 'Brand')} on {r.get('Platform', 'web')}",
+        "summary": lambda r: f"Score {r.get('Sentiment_Score', '—')} · {r.get('Topic', '')} · {r.get('Mention_Count', 0):,} mentions",
+        "timestamp_key": "Period",
+    },
+    "Commodity_Price": {
+        "kind": "commodity_price",
+        "id_key": "Price_ID",
+        "title": lambda r: f"{r.get('Commodity', 'Commodity')} — {r.get('Price_Per_Unit', '')} {r.get('Currency', '')}/{r.get('Unit', '')}",
+        "summary": lambda r: f"{r.get('Source', '')} · 30d {r.get('Change_Pct_30D', '')}% · {r.get('Date', '')}",
+        "timestamp_key": "Date",
+    },
+}
+
 
 class ExternalSourceSimulatorService(BaseSimulatorService):
 
@@ -49,6 +105,9 @@ class ExternalSourceSimulatorService(BaseSimulatorService):
 
     def __init__(self, bucket: str = "", prefix: str = ""):
         super().__init__(bucket, prefix)
+        self._artifact_files: list[dict[str, Any]] = []
+        self._social_items: list[dict[str, Any]] = []
+        self._artifacts_by_path: dict[str, dict[str, Any]] = {}
         self._refresh_config()
 
     def _refresh_config(self):
@@ -224,6 +283,137 @@ class ExternalSourceSimulatorService(BaseSimulatorService):
             })
         data_map["Lab_Report_Upload"] = labs
 
+    # ─── Artifact catalog (files + social; mapping tables are out of band) ─
+
+    async def rebuild_catalog_from_cache(self) -> bool:
+        ok = await super().rebuild_catalog_from_cache()
+        if self._loaded:
+            await self._rebuild_artifacts()
+        return ok
+
+    def get_status(self) -> dict[str, Any]:
+        st = super().get_status()
+        st["schema"] = SCHEMA
+        files = self._artifact_files or []
+        social = self._social_items or []
+        st["file_count"] = len(files)
+        st["social_item_count"] = len(social)
+        counts = {s["id"]: 0 for s in SOURCES}
+        for f in files:
+            sid = f.get("source_id")
+            if sid in counts:
+                counts[sid] += 1
+        counts["social_listening"] = len(social)
+        st["source_counts"] = counts
+        st["mapping_table_count"] = st.get("table_count", 0)
+        return st
+
+    async def get_sources_catalog(self) -> list[dict[str, Any]]:
+        if not self._loaded:
+            return [{**s, "file_count": 0, "feed_count": 0} for s in SOURCES]
+        files = self._artifact_files or []
+        social = self._social_items or []
+        out: list[dict[str, Any]] = []
+        for src in SOURCES:
+            sid = src["id"]
+            if sid == "social_listening":
+                out.append({**src, "file_count": 0, "feed_count": len(social)})
+            else:
+                fc = sum(1 for f in files if f.get("source_id") == sid)
+                out.append({**src, "file_count": fc, "feed_count": 0})
+        return out
+
+    async def get_files_manifest(self, source_id: str | None = None) -> list[dict[str, Any]]:
+        files = list(self._artifact_files or [])
+        if source_id:
+            files = [f for f in files if f.get("source_id") == source_id]
+        return files
+
+    async def get_social_feed(self, limit: int = 100) -> list[dict[str, Any]]:
+        items = list(self._social_items or [])
+        return items[: max(1, min(limit, 500))]
+
+    async def get_file_preview(self, path: str) -> dict[str, Any]:
+        artifact = self._artifacts_by_path.get(path)
+        if not artifact:
+            for f in self._artifact_files or []:
+                if f.get("path") == path:
+                    artifact = f
+                    break
+        if not artifact:
+            return {"content": "", "content_type": "text/plain"}
+        meta = {k: v for k, v in artifact.items() if k not in ("metadata",)}
+        body = json.dumps({"simulated_file": True, "artifact": meta, "extracted": artifact.get("metadata") or {}}, indent=2)
+        return {"content": body, "content_type": "application/json"}
+
+    async def _rebuild_artifacts(self) -> None:
+        files: list[dict[str, Any]] = []
+        social: list[dict[str, Any]] = []
+        by_path: dict[str, dict[str, Any]] = {}
+
+        for table_name, system in TABLE_SYSTEM_MAP.items():
+            if table_name in SOCIAL_TABLE_SPECS:
+                spec = SOCIAL_TABLE_SPECS[table_name]
+                rows = await self._get_table_data(SCHEMA, table_name)
+                for row in rows:
+                    title_fn = spec["title"]
+                    summary_fn = spec["summary"]
+                    ts_key = spec.get("timestamp_key")
+                    social.append({
+                        "id": str(row.get(spec.get("id_key", "")) or len(social)),
+                        "source_id": "social_listening",
+                        "kind": spec["kind"],
+                        "table": table_name,
+                        "title": title_fn(row) if callable(title_fn) else str(title_fn),
+                        "summary": summary_fn(row) if callable(summary_fn) else str(summary_fn),
+                        "timestamp": row.get(ts_key) if ts_key else None,
+                        "metadata": row,
+                    })
+                continue
+
+            if table_name not in FILE_TABLE_SPECS:
+                continue
+
+            spec = FILE_TABLE_SPECS[table_name]
+            rows = await self._get_table_data(SCHEMA, table_name)
+            source_id = SOURCE_SLUG.get(system, "google_drive")
+            for row in rows:
+                path = ""
+                if spec.get("synthetic_path"):
+                    doc_id = row.get("Document_ID", "doc")
+                    title = row.get("Title", "document")
+                    ext = row.get("File_Type", "pdf")
+                    path = f"/drive/{doc_id}/{title}.{ext}"
+                    name = f"{title}.{ext}"
+                else:
+                    path = str(row.get(spec.get("path_key", ""), "") or "").strip()
+                    name = path.split("/")[-1] if path else str(row.get(spec["id_key"], table_name))
+
+                if not path:
+                    continue
+
+                artifact = {
+                    "name": name,
+                    "path": path,
+                    "source_id": source_id,
+                    "source_label": system.replace("_", " "),
+                    "kind": spec.get("kind", "file"),
+                    "table": table_name,
+                    "id": row.get(spec["id_key"]),
+                    "metadata": row,
+                }
+                if spec.get("synthetic_path") and row.get("File_Size_KB"):
+                    artifact["size_kb"] = row.get("File_Size_KB")
+                files.append(artifact)
+                by_path[path] = artifact
+
+        files.sort(key=lambda f: (f.get("source_id", ""), f.get("path", "")))
+        social.sort(key=lambda s: str(s.get("timestamp") or ""), reverse=True)
+
+        self._artifact_files = files
+        self._social_items = social
+        self._artifacts_by_path = by_path
+
     # ─── Extra methods specific to External simulator ────────────────────
 
     async def save_to_s3(self) -> dict[str, Any]:
@@ -273,6 +463,7 @@ class ExternalSourceSimulatorService(BaseSimulatorService):
         rows.append(row)
         await self._store_table(SCHEMA, table_name, rows)
         sim_logger.info(f"Inserted row into {table_name}, total now {len(rows)}")
+        await self._rebuild_artifacts()
 
     async def next_id(self, table_name: str, prefix: str) -> str:
         rows = await self._get_table_data(SCHEMA, table_name)
