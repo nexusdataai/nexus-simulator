@@ -1,19 +1,20 @@
 import * as React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/core/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { InlineError, StatusPill, TableShell } from '@/components/ds/kit';
-import { SectionHeader } from '@/components/ds/primitives';
+import { InlineError, MetricStrip, StatusPill, TableShell } from '@/components/ds/kit';
 import { AnimatedNumber } from '@/components/ds/AnimatedNumber';
 import { Icon } from '@/components/ds/Icon';
 import { SystemLogo } from '@/components/ds/SystemLogo';
 import { confirmDialog } from '@/components/ds/confirm';
-import { DOMAINS, SIMULATORS, type SimulatorDef } from '@/config/simulators';
+import { DOMAINS, SIMULATORS, type DomainId, type SimulatorDef } from '@/config/simulators';
 import { useLoad } from '@/hooks/useLoad';
-import { ago, compact, dateTime, errorText, num } from '@/core/format';
+import { ago, dateTime, errorText, num } from '@/core/format';
 import { listSimulators, seedAllTelco, type SimStatus } from '@/services/api';
+
+type Ecosystem = 'all' | DomainId;
 
 function statusOf(s?: SimStatus): { word: string; label: string } {
   if (!s) return { word: 'unknown', label: 'No answer' };
@@ -22,19 +23,16 @@ function statusOf(s?: SimStatus): { word: string; label: string } {
   return { word: 'healthy', label: 'Loaded' };
 }
 
-/* --------------------------------------------------------- volume drawing */
-
-/** One hue, lighter for each smaller system. */
 const shade = (i: number) => `hsl(var(--brand) / ${Math.max(0.22, 1 - i * 0.1)})`;
 
-/** One bar showing how the rows are shared between the systems. */
 function VolumeBar({ items, onOpen }: { items: { sim: SimulatorDef; rows: number }[]; onOpen: (id: string) => void }) {
   const total = items.reduce((a, b) => a + b.rows, 0) || 1;
   const sorted = [...items].sort((a, b) => b.rows - a.rows);
   const [hot, setHot] = React.useState<string | null>(null);
+  if (!sorted.some(x => x.rows > 0)) return null;
   return (
     <div>
-      <div className="grow-x flex h-11 w-full gap-[3px] overflow-hidden rounded-lg" role="img" aria-label="Share of rows per system">
+      <div className="grow-x flex h-9 w-full gap-0.5 overflow-hidden rounded-md" role="img" aria-label="Share of rows per system">
         {sorted.map(({ sim, rows }, i) => {
           const pct = (rows / total) * 100;
           return (
@@ -45,68 +43,77 @@ function VolumeBar({ items, onOpen }: { items: { sim: SimulatorDef; rows: number
                   onClick={() => onOpen(sim.id)}
                   onMouseEnter={() => setHot(sim.id)}
                   onMouseLeave={() => setHot(null)}
-                  onFocus={() => setHot(sim.id)}
-                  onBlur={() => setHot(null)}
                   aria-label={`${sim.name}: ${num(rows)} rows`}
-                  style={{ width: `${Math.max(pct, 1.2)}%`, backgroundColor: shade(i), opacity: hot && hot !== sim.id ? 0.4 : 1 }}
-                  className="h-full min-w-[6px] transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground"
+                  style={{ width: `${Math.max(pct, 1.2)}%`, backgroundColor: shade(i), opacity: hot && hot !== sim.id ? 0.45 : 1 }}
+                  className="h-full min-w-[5px] transition-opacity duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 />
               </TooltipTrigger>
-              <TooltipContent side="top">
-                <span className="font-medium">{sim.name}</span> · <span className="num">{num(rows)}</span> rows · <span className="num">{pct.toFixed(pct < 1 ? 1 : 0)}%</span>
+              <TooltipContent side="top" className="text-xs">
+                {sim.short} · <span className="num">{num(rows)}</span> rows
               </TooltipContent>
             </Tooltip>
           );
         })}
       </div>
-      <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
-        {sorted.map(({ sim, rows }, i) => (
-          <li key={sim.id}>
-            <button
-              type="button"
-              onClick={() => onOpen(sim.id)}
-              onMouseEnter={() => setHot(sim.id)}
-              onMouseLeave={() => setHot(null)}
-              className={cn('flex items-center gap-2 rounded text-sm transition-opacity duration-200', hot && hot !== sim.id && 'opacity-50')}
-            >
-              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: shade(i) }} aria-hidden="true" />
-              <span className="text-muted-foreground">{sim.short}</span>
-              <span className="num text-foreground">{compact(rows)}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ page */
+const ECOSYSTEM_TABS: { id: Ecosystem; label: string }[] = [
+  { id: 'all', label: 'All ecosystems' },
+  { id: 'supply-chain', label: 'Supply chain' },
+  { id: 'telecom', label: 'Telecom' },
+];
+
+function domainTitle(id: Ecosystem): string {
+  if (id === 'all') return 'All practice systems';
+  return DOMAINS.find(d => d.id === id)?.title ?? id;
+}
 
 export default function OverviewPage() {
   const nav = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ecosystem: Ecosystem = (searchParams.get('ecosystem') as Ecosystem) || 'all';
+  const setEcosystem = (v: Ecosystem) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (v === 'all') next.delete('ecosystem');
+      else next.set('ecosystem', v);
+      return next;
+    }, { replace: true });
+  };
+
   const { data, error, loading, reload } = useLoad(listSimulators);
   const [seeding, setSeeding] = React.useState(false);
 
   const byService = React.useMemo(() => new Map((data || []).map(s => [String(s.service), s])), [data]);
   const known = SIMULATORS.map(sim => ({ sim, s: byService.get(sim.service) }));
 
+  const scoped = React.useMemo(
+    () => (ecosystem === 'all' ? known : known.filter(k => k.sim.domain === ecosystem)),
+    [known, ecosystem],
+  );
+
   const totals = React.useMemo(() => {
-    const list = data || [];
+    const list = scoped.map(k => k.s).filter(Boolean) as SimStatus[];
     return {
-      systems: list.length,
+      systems: scoped.length,
       loaded: list.filter(s => s.enabled && s.loaded).length,
       tables: list.reduce((a, s) => a + (s.table_count || 0), 0),
+      tablesWithData: list.reduce((a, s) => a + (s.tables_with_data || 0), 0),
       rows: list.reduce((a, s) => a + (s.total_rows || 0), 0),
-      extras: list.reduce((a, s) => a + (s.file_count || 0) + (s.api_count || 0) + (s.stream_count || 0), 0),
+      files: list.reduce((a, s) => a + (s.file_count || 0), 0),
+      apis: list.reduce((a, s) => a + (s.api_count || 0), 0),
+      streams: list.reduce((a, s) => a + (s.stream_count || 0), 0),
     };
-  }, [data]);
+  }, [scoped]);
 
   const open = (id: string) => nav(`/simulators/${id}`);
 
   const seedTelco = async () => {
     const ok = await confirmDialog({
       title: 'Seed all telecom systems?',
-      description: 'This regenerates the BSS, NSS and OSS practice data on the server. Anything using that data will see the new rows.',
+      description: 'Regenerates BSS, NSS and OSS practice data (tables, files, APIs, streams).',
       confirmLabel: 'Seed telecom',
     });
     if (!ok) return;
@@ -122,109 +129,151 @@ export default function OverviewPage() {
     }
   };
 
+  const domainMeta = ecosystem !== 'all' ? DOMAINS.find(d => d.id === ecosystem) : null;
+
   return (
-    <div className="page space-y-8">
-      {/* Headline: written as a sentence, numbers inline */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-sm font-medium text-muted-foreground">Enterprise simulator</h1>
-          <p className="mt-2 max-w-3xl text-2xl font-medium leading-9 tracking-tight text-foreground sm:text-3xl sm:leading-[2.6rem]">
-            <AnimatedNumber value={data ? totals.loaded : null} className="num" /> of {data ? totals.systems : '—'} systems are loaded, holding{' '}
-            <AnimatedNumber value={data ? totals.tables : null} className="num text-primary dark:text-brand-hi" /> tables and{' '}
-            <AnimatedNumber value={data ? totals.rows : null} className="num text-primary dark:text-brand-hi" /> rows of practice data.
-          </p>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Replicas of the enterprise systems Nexus AI connects to. Use them to test connectors, journeys and solutions without touching a real system.
+    <div className="page space-y-5">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <p className="eyebrow text-subtle-foreground">Enterprise simulator</p>
+          <h1 className="text-xl font-medium tracking-tight text-foreground sm:text-2xl">
+            Practice data ecosystem
+          </h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            {domainMeta?.description ?? 'Supply chain and telecom replicas for connectors, journeys and solutions—without touching production.'}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={reload} disabled={loading} className="shrink-0">
-          <Icon name="refresh" className={cn(loading && 'animate-spin')} /> Refresh
-        </Button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {ecosystem === 'telecom' && (
+            <Button variant="outline" size="sm" onClick={seedTelco} disabled={seeding}>
+              <Icon name={seeding ? 'spinner' : 'sparkles'} className={cn(seeding && 'animate-spin')} /> Seed telecom
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
+            <Icon name="refresh" className={cn(loading && 'animate-spin')} /> Refresh
+          </Button>
+        </div>
       </header>
+
+      <div
+        className="flex flex-wrap gap-1 rounded-lg border border-border bg-surface-2 p-1"
+        role="tablist"
+        aria-label="Ecosystem"
+      >
+        {ECOSYSTEM_TABS.map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={ecosystem === tab.id}
+            onClick={() => setEcosystem(tab.id)}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              ecosystem === tab.id
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       {error && <InlineError onRetry={reload}>Could not load the systems. {error}</InlineError>}
 
-      {data && totals.rows > 0 && (
-        <section aria-label="Where the rows are">
-          <div className="mb-3 flex items-baseline justify-between gap-3">
-            <h2 className="text-md font-medium text-foreground">Where the rows are</h2>
-            <span className="text-xs text-muted-foreground">Select a system to open it</span>
-          </div>
-          <VolumeBar items={known.filter(k => k.s).map(k => ({ sim: k.sim, rows: k.s!.total_rows || 0 }))} onOpen={open} />
-        </section>
+      {data && (
+        <MetricStrip
+          columns={6}
+          items={[
+            { label: 'Systems loaded', value: <><AnimatedNumber value={totals.loaded} className="num" /> / {totals.systems}</> },
+            { label: 'Tables', value: <><span className="num">{num(totals.tablesWithData)}</span><span className="text-subtle-foreground"> / {num(totals.tables)}</span></> },
+            { label: 'Rows', value: <AnimatedNumber value={totals.rows} className="num" /> },
+            { label: 'Files', value: <AnimatedNumber value={totals.files} className="num" /> },
+            { label: 'APIs', value: <AnimatedNumber value={totals.apis} className="num" /> },
+            { label: 'Streams', value: <AnimatedNumber value={totals.streams} className="num" /> },
+          ]}
+        />
       )}
 
-      {DOMAINS.map(domain => {
-        const rows = known.filter(k => k.sim.domain === domain.id);
-        return (
-          <section key={domain.id} aria-labelledby={`domain-${domain.id}`} className="space-y-3">
-            <SectionHeader
-              title={domain.title}
-              description={domain.description}
-              actions={domain.id === 'telecom' ? (
-                <Button variant="outline" size="sm" onClick={seedTelco} disabled={seeding}>
-                  <Icon name={seeding ? 'spinner' : 'sparkles'} className={cn(seeding && 'animate-spin')} /> Seed all telecom
-                </Button>
-              ) : undefined}
-            />
-            <TableShell>
-              <table className="w-full text-sm">
-                <thead className="border-b border-border text-xs text-muted-foreground">
-                  <tr>
-                    <th id={`domain-${domain.id}`} className="px-4 py-2.5 text-left font-medium">System</th>
-                    <th className="px-4 py-2.5 text-left font-medium">Status</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Tables with data</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Rows</th>
-                    <th className="hidden px-4 py-2.5 text-right font-medium lg:table-cell">Files · APIs · Streams</th>
-                    <th className="hidden px-4 py-2.5 text-right font-medium md:table-cell">Data from</th>
-                    <th className="w-8" aria-hidden="true" />
+      {data && totals.rows > 0 && (
+        <VolumeBar
+          items={scoped.filter(k => k.s).map(k => ({ sim: k.sim, rows: k.s!.total_rows || 0 }))}
+          onOpen={open}
+        />
+      )}
+
+      <section aria-labelledby="ecosystem-systems" className="space-y-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 id="ecosystem-systems" className="text-sm font-medium text-foreground">
+            {domainTitle(ecosystem)}
+          </h2>
+          <span className="text-xs text-muted-foreground">Open a row for tables, files, APIs and streams</span>
+        </div>
+        <TableShell>
+          <table className="w-full text-sm">
+            <thead className="border-b border-border text-xs text-muted-foreground">
+              <tr>
+                {ecosystem === 'all' && <th className="px-3 py-2 text-left font-medium">Ecosystem</th>}
+                <th className="px-3 py-2 text-left font-medium">System</th>
+                <th className="px-3 py-2 text-left font-medium">Status</th>
+                <th className="px-3 py-2 text-right font-medium">Tables</th>
+                <th className="px-3 py-2 text-right font-medium">Rows</th>
+                <th className="px-3 py-2 text-right font-medium">Files</th>
+                <th className="px-3 py-2 text-right font-medium">APIs</th>
+                <th className="px-3 py-2 text-right font-medium">Streams</th>
+                <th className="hidden px-3 py-2 text-right font-medium md:table-cell">Updated</th>
+                <th className="w-6" aria-hidden="true" />
+              </tr>
+            </thead>
+            <tbody>
+              {scoped.map(({ sim, s }) => {
+                const st = statusOf(s);
+                const domainLabel = DOMAINS.find(d => d.id === sim.domain)?.title ?? sim.domain;
+                return (
+                  <tr
+                    key={sim.id}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Open ${sim.name}`}
+                    onClick={() => open(sim.id)}
+                    onKeyDown={e => { if (e.key === 'Enter') open(sim.id); }}
+                    className="group cursor-pointer border-b border-border transition-colors last:border-b-0 hover:bg-surface-2/60 focus-visible:bg-surface-2/60 focus-visible:outline-none"
+                  >
+                    {ecosystem === 'all' && (
+                      <td className="whitespace-nowrap px-3 py-2.5 text-xs text-muted-foreground">{domainLabel}</td>
+                    )}
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <SystemLogo system={sim.logo} size="sm" />
+                        <div className="min-w-0">
+                          <div className="font-medium text-foreground group-hover:text-primary dark:group-hover:text-brand-hi">{sim.name}</div>
+                          <div className="hidden max-w-xs truncate text-xs text-muted-foreground lg:block">{sim.description}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5">
+                      {loading && !data ? <span className="text-subtle-foreground">…</span> : <StatusPill status={st.word}>{st.label}</StatusPill>}
+                    </td>
+                    <td className="num whitespace-nowrap px-3 py-2.5 text-right text-xs">
+                      {s ? <>{num(s.tables_with_data)}<span className="text-subtle-foreground">/{num(s.table_count)}</span></> : '—'}
+                    </td>
+                    <td className="num whitespace-nowrap px-3 py-2.5 text-right">{num(s?.total_rows)}</td>
+                    <td className="num whitespace-nowrap px-3 py-2.5 text-right text-foreground">{num(s?.file_count)}</td>
+                    <td className="num whitespace-nowrap px-3 py-2.5 text-right text-foreground">{num(s?.api_count)}</td>
+                    <td className="num whitespace-nowrap px-3 py-2.5 text-right text-foreground">{num(s?.stream_count)}</td>
+                    <td className="hidden whitespace-nowrap px-3 py-2.5 text-right text-xs text-muted-foreground md:table-cell" title={dateTime(s?.dump_timestamp || s?.backbone_generated_at)}>
+                      {ago(s?.backbone_generated_at || s?.dump_timestamp)}
+                    </td>
+                    <td className="pr-2 text-subtle-foreground">
+                      <Icon name="chevron-right" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {rows.map(({ sim, s }) => {
-                    const st = statusOf(s);
-                    return (
-                      <tr
-                        key={sim.id}
-                        tabIndex={0}
-                        role="link"
-                        aria-label={`Open ${sim.name}`}
-                        onClick={() => open(sim.id)}
-                        onKeyDown={e => { if (e.key === 'Enter') open(sim.id); }}
-                        className="group cursor-pointer border-b border-border transition-colors last:border-b-0 hover:bg-surface-2/70 focus-visible:bg-surface-2/70 focus-visible:outline-none"
-                      >
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <SystemLogo system={sim.logo} size="md" />
-                            <div className="min-w-0">
-                              <div className="font-medium text-foreground group-hover:text-primary dark:group-hover:text-brand-hi">{sim.name}</div>
-                              <div className="hidden max-w-md truncate text-xs text-muted-foreground sm:block">{sim.description}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3.5">
-                          {loading && !data ? <span className="text-subtle-foreground">…</span> : <StatusPill status={st.word}>{st.label}</StatusPill>}
-                        </td>
-                        <td className="num whitespace-nowrap px-4 py-3.5 text-right">
-                          {s ? <>{num(s.tables_with_data)} <span className="text-subtle-foreground">/ {num(s.table_count)}</span></> : '—'}
-                        </td>
-                        <td className="num px-4 py-3.5 text-right text-foreground">{num(s?.total_rows)}</td>
-                        <td className="num hidden whitespace-nowrap px-4 py-3.5 text-right text-muted-foreground lg:table-cell">
-                          {s ? `${num(s.file_count)} · ${num(s.api_count)} · ${num(s.stream_count)}` : '—'}
-                        </td>
-                        <td className="hidden whitespace-nowrap px-4 py-3.5 text-right text-muted-foreground md:table-cell" title={dateTime(s?.dump_timestamp)}>
-                          {ago(s?.dump_timestamp)}
-                        </td>
-                        <td className="pr-3 text-subtle-foreground"><Icon name="chevron-right" className="transition-transform group-hover:translate-x-0.5" /></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </TableShell>
-          </section>
-        );
-      })}
+                );
+              })}
+            </tbody>
+          </table>
+        </TableShell>
+      </section>
     </div>
   );
 }
