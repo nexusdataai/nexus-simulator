@@ -8,6 +8,7 @@ import OverviewPage from '@/pages/OverviewPage';
 import SystemsPage from '@/pages/SystemsPage';
 import ScenariosPage from '@/pages/ScenariosPage';
 import TablesPage from '@/pages/TablesPage';
+import BillingPage from '@/pages/BillingPage';
 import ApisPage from '@/pages/ApisPage';
 import SettingsPage from '@/pages/SettingsPage';
 import NotFoundPage from '@/pages/NotFoundPage';
@@ -31,6 +32,7 @@ export default function App() {
               <Route path="/operations/simulators" element={<Navigate to="/simulators" replace />} />
               <Route path="/scenarios" element={<ScenariosPage />} />
               <Route path="/tables" element={<TablesPage />} />
+              <Route path="/billing" element={<BillingPage />} />
               <Route path="/apis" element={<ApisPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<NotFoundPage />} />

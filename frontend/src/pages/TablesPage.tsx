@@ -82,7 +82,7 @@ export default function TablesPage() {
             onChange={setModule}
             options={[
               { value: 'all', label: 'All data', count: tables.length },
-              { value: 'billing', label: 'Billing (Kenan BP)', count: billingCount },
+              { value: 'billing', label: 'Billing', count: billingCount },
             ]}
           />
         )}

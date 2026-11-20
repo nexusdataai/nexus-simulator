@@ -272,6 +272,36 @@ export const getSimulatorTables = (service: string) =>
 
 export const seedBillingTelco = () => request<{ message?: string }>('/api/v1/telco/seed-billing', post(), LONG);
 
+export interface BillingFeed {
+  id: string;
+  name: string;
+  layer: string;
+  source_lineage?: string;
+  key_data?: string;
+  format?: string;
+  delivery?: string[];
+  intake?: string;
+  lands_in?: string;
+  tmf_sid?: string;
+  simulated_rows?: number;
+  table_count?: number;
+  linked_tables?: { service: string; schema?: string; table?: string; rows?: number }[];
+}
+
+export interface BillingOverview {
+  feeds: BillingFeed[];
+  tables: (TableRef & { service: string; schema?: string; table?: string; rows?: number })[];
+  totals?: {
+    feeds: number;
+    tables: number;
+    rows: number;
+    by_layer?: { tables: Record<string, number>; rows: Record<string, number> };
+  };
+}
+
+export const getBillingOverview = (layer?: string) =>
+  request<BillingOverview>(`/api/v1/telco/billing${layer ? `?layer=${enc(layer)}` : ''}`);
+
 export const seedAllTelco = () => request<{ message?: string }>('/api/v1/telco/seed-all', post(), LONG);
 
 /* ------------------------------------------------------------ one system */

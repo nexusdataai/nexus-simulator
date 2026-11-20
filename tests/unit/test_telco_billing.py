@@ -44,3 +44,15 @@ async def test_bss_billing_seed_marks_tables_and_kenan():
     kenan = [o for o in objects if o.get("schemaName") == "kenan_bp"]
     assert kenan
     assert any(o.get("tableName") == "CMF" for o in kenan)
+
+
+@pytest.mark.asyncio
+async def test_billing_overview_endpoint():
+    from nexus_simulator.services.telco_billing_overview import build_billing_overview
+
+    sim = build_simulator(SimulatorConfig(bss=BSSPluginConfig()))
+    pools = get_telco_pools()
+    await sim.bss.generate_backbone(pools=pools, include_legacy_tables=True)
+    overview = await build_billing_overview(sim)
+    assert overview.get("feeds")
+    assert overview["totals"]["tables"] >= 1

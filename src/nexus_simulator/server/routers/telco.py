@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
+
+from nexus_simulator.services.telco_billing_overview import build_billing_overview
 
 logger = logging.getLogger(__name__)
 
@@ -68,3 +70,15 @@ async def seed_all(request: Request, include_sources: bool = False, include_gold
             )
 
     return SeedAllResponse(success=True, message="All telco plugins seeded", results=results)
+
+
+@router.get("/billing")
+async def billing_overview(
+    request: Request,
+    layer: str | None = Query(None, description="Filter feeds: BSS, OSS, or NSS"),
+):
+    """Inbound billing feeds (Kenan-style) plus billing-tagged tables from BSS, NSS, and OSS."""
+    sim = getattr(request.app.state, "simulator", None)
+    if sim is None:
+        raise HTTPException(status_code=503, detail="simulator not initialised")
+    return await build_billing_overview(sim, layer=layer)

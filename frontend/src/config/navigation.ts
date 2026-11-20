@@ -32,6 +32,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Data',
     items: [
+      { id: 'billing', name: 'Billing', path: '/billing', icon: 'receipt', hint: 'Billing feeds and data across BSS, OSS, NSS' },
       { id: 'tables', name: 'Tables', path: '/tables', icon: 'table', hint: 'Every table across all systems' },
       { id: 'apis', name: 'Vendor APIs', path: '/apis', icon: 'plug', hint: 'Salesforce, Oracle and SAP style endpoints' },
     ],

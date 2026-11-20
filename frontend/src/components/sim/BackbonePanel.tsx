@@ -139,7 +139,7 @@ function ConfigureDialog({ catalog, cfg, setCfg, onClose, onGenerate, generating
               return { ...c, included: billing.size ? billing : c.included };
             })}
           >
-            Billing module only (Kenan BP)
+            Billing families only
           </Button>
         </div>
 
