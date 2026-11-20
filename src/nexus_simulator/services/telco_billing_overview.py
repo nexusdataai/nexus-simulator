@@ -1,4 +1,4 @@
-"""Aggregate live billing artifacts from BSS / NSS / OSS simulators."""
+"""Aggregate live billing **input feed** artifacts from BSS / NSS / OSS simulators."""
 
 from __future__ import annotations
 
@@ -15,6 +15,12 @@ from nexus_simulator.telco_backbone.billing import (
 
 _TELCO_SERVICES = ("bss", "nss", "oss")
 _SVC_LAYER = {"bss": "BSS", "nss": "NSS", "oss": "OSS"}
+_LAYER_SVC = {"BSS": "bss", "NSS": "nss", "OSS": "oss"}
+
+ONTOLOGY_ETL_NOTE = (
+    "Simulator emits inbound billing feeds only. Nexus Ontology ETL ingests these artifacts "
+    "and hydrates Kenan BP final tables (CMF, CDR_DATA, BILL_INVOICE, …)."
+)
 
 
 @lru_cache(maxsize=1)
@@ -31,12 +37,14 @@ def load_billing_feeds() -> list[dict[str, Any]]:
         p = Path(__file__).resolve().parents[1] / "data" / "telco" / "billing_feeds.json"
         raw = p.read_text(encoding="utf-8")
     data = json.loads(raw)
-    return list(data.get("feeds") or [])
+    return [f for f in (data.get("feeds") or []) if f.get("role") != "ontology_output"]
 
 
-def _billing_obj(row: dict[str, Any]) -> bool:
+def _billing_input_obj(row: dict[str, Any]) -> bool:
+    if row.get("schemaName") == "kenan_bp" or row.get("role") == "kenan_destination":
+        return False
     apps = row.get("applications") or []
-    return "billing" in apps
+    return "billing_input" in apps or "billing" in apps
 
 
 def _billing_sk(sk: str | None, layer: str) -> bool:
@@ -45,6 +53,59 @@ def _billing_sk(sk: str | None, layer: str) -> bool:
     if is_billing_system(sk):
         return True
     return sk in billing_system_keys_for_layer(layer)
+
+
+def _sk_matches(keys: set[str], sk: str | None) -> bool:
+    if not sk or not keys:
+        return False
+    return sk in keys
+
+
+def _delivery_set(feed: dict[str, Any]) -> set[str]:
+    return {str(d).strip().upper() for d in (feed.get("delivery") or [])}
+
+
+def enrich_input_feeds(
+    feeds: list[dict[str, Any]],
+    layers: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for feed in feeds:
+        layer = str(feed.get("layer") or "").upper()
+        svc = _LAYER_SVC.get(layer)
+        bundle = layers.get(svc or "") if svc else None
+        keys = {str(k) for k in (feed.get("atlas_system_keys") or [])}
+        deliveries = _delivery_set(feed)
+        artifacts: list[dict[str, Any]] = []
+
+        if bundle and keys:
+            if "TABLE" in deliveries:
+                for t in bundle.get("tables") or []:
+                    if _sk_matches(keys, t.get("system_key")):
+                        artifacts.append({"kind": "table", **t})
+            if "FILE" in deliveries:
+                for f in bundle.get("files") or []:
+                    if _sk_matches(keys, f.get("system_key")):
+                        artifacts.append({"kind": "file", **f})
+            if "API" in deliveries:
+                for a in bundle.get("apis") or []:
+                    if _sk_matches(keys, a.get("system_key")):
+                        artifacts.append({"kind": "api", **a})
+            if "STREAM" in deliveries:
+                for s in bundle.get("streams") or []:
+                    if _sk_matches(keys, s.get("system_key")):
+                        artifacts.append({"kind": "stream", **s})
+
+        ontology_lands_in = feed.get("ontology_lands_in") or feed.get("lands_in")
+        out.append(
+            {
+                **feed,
+                "ontology_lands_in": ontology_lands_in,
+                "artifacts": artifacts,
+                "artifact_count": len(artifacts),
+            }
+        )
+    return out
 
 
 async def _layer_bundle(service: str, svc: Any) -> dict[str, Any]:
@@ -56,7 +117,7 @@ async def _layer_bundle(service: str, svc: Any) -> dict[str, Any]:
         except Exception:
             objs = []
         for o in objs:
-            if isinstance(o, dict) and _billing_obj(o):
+            if isinstance(o, dict) and _billing_input_obj(o):
                 tables.append(
                     {
                         "service": service,
@@ -205,7 +266,11 @@ async def build_billing_overview(simulator: Any, *, layer: str | None = None) ->
         all_apis.extend(b.get("apis") or [])
         all_streams.extend(b.get("streams") or [])
 
+    input_feeds = enrich_input_feeds(load_billing_feeds(), layers)
+
     return {
+        "ontology_etl_note": ONTOLOGY_ETL_NOTE,
+        "input_feeds": input_feeds,
         "layers": {k: layers[k] for k in filtered_services if k in layers},
         "tables": all_tables,
         "files": all_files,
@@ -217,6 +282,8 @@ async def build_billing_overview(simulator: Any, *, layer: str | None = None) ->
             "files": len(all_files),
             "apis": len(all_apis),
             "streams": len(all_streams),
+            "input_feeds": len(input_feeds),
+            "input_feeds_with_data": sum(1 for f in input_feeds if (f.get("artifact_count") or 0) > 0),
             "by_layer": {
                 "tables": layer_table_counts,
                 "rows": layer_row_counts,

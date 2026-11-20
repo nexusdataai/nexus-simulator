@@ -25,7 +25,7 @@ class SeedAllResponse(BaseModel):
 
 @router.post("/seed-billing", response_model=SeedAllResponse)
 async def seed_billing(request: Request):
-    """Seed BSS → NSS → OSS with the billing backbone profile (Kenan BP–aligned families + Kenan tables on BSS)."""
+    """Seed BSS → NSS → OSS with billing **input** families only (no Kenan final tables unless TELCO_KENAN_FINAL_TABLES=true)."""
     import os
 
     prev = os.environ.get("TELCO_BACKBONE_PROFILE")
@@ -77,7 +77,7 @@ async def billing_overview(
     request: Request,
     layer: str | None = Query(None, description="Filter feeds: BSS, OSS, or NSS"),
 ):
-    """Inbound billing feeds (Kenan-style) plus billing-tagged tables from BSS, NSS, and OSS."""
+    """Inbound billing input feeds linked to live BSS, NSS, and OSS artifacts (Ontology ETL hydrates final Kenan tables)."""
     sim = getattr(request.app.state, "simulator", None)
     if sim is None:
         raise HTTPException(status_code=503, detail="simulator not initialised")

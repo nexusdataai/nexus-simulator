@@ -305,7 +305,9 @@ class TelcoBackboneMixin:
         }.get(svc_name, f"{svc_name}_core")
 
         merged: Dict[str, Dict[str, List[dict]]] = {base_schema: legacy_map, atlas_schema: atlas_tables}
-        if svc_name == "bss" and include_legacy_tables:
+        from nexus_simulator.telco_backbone.billing import include_kenan_final_tables
+
+        if svc_name == "bss" and include_legacy_tables and include_kenan_final_tables():
             from nexus_simulator.plugins.kenan_bp_tables import build_kenan_bp_tables
 
             merged["kenan_bp"] = build_kenan_bp_tables(pool)
@@ -558,12 +560,6 @@ class TelcoBackboneMixin:
             catalog[key] = catalog_entry_for_table(
                 self.SERVICE_NAME, atlas_schema, tname, system_key=sk or None
             )
-        if self.SERVICE_NAME == "bss":
-            from nexus_simulator.telco_backbone.billing import KENAN_BILLING_TABLES
-
-            for tname in KENAN_BILLING_TABLES:
-                key = f"kenan_bp.{tname}"
-                catalog[key] = catalog_entry_for_table(self.SERVICE_NAME, "kenan_bp", tname)
         for t in self._tables or []:
             key = f"{t.schema_name}.{t.table_name}"
             if key in catalog:

@@ -139,7 +139,7 @@ export default function BillingPage() {
     <div className="page space-y-5">
       <PageHeader
         title="Billing"
-        description="Simulator-generated billing input: tables, files, vendor APIs, and streams from BSS, OSS, and NSS. Seed or regenerate billing families to refresh everything below."
+        description="Inbound billing feeds only — tables, files, APIs, and streams the simulator emits for Nexus Ontology ETL. Final Kenan tables (CMF, BILL_INVOICE, CDR_DATA, …) are hydrated in the ontology, not here."
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={() => setAttempt(a => a + 1)} disabled={loading}>
@@ -154,6 +154,64 @@ export default function BillingPage() {
       />
 
       {error && <InlineError onRetry={() => setAttempt(a => a + 1)}>{error}</InlineError>}
+
+      {data?.ontology_etl_note && (
+        <p className="rounded-lg border border-border bg-surface-2/40 px-4 py-3 text-sm text-muted-foreground">
+          {data.ontology_etl_note}{' '}
+          <Link to="/telco-atlas/kenan.html" className="text-primary hover:underline dark:text-brand-hi">
+            Kenan final tables reference
+          </Link>
+        </p>
+      )}
+
+      {(data?.input_feeds?.length ?? 0) > 0 && (
+        <TableShell>
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-medium">Inbound billing feeds</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Mapped to Kenan BP intake; <strong className="font-medium text-foreground">Lands in (Ontology ETL)</strong> is documentation only.
+              {totals?.input_feeds_with_data != null && (
+                <> · {num(totals.input_feeds_with_data)} / {num(totals.input_feeds ?? data?.input_feeds?.length)} feeds have live simulator artifacts.</>
+              )}
+            </p>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="border-b border-border">
+              <tr>
+                <th className={th}>Feed</th>
+                <th className={cn(th, 'w-16')}>Layer</th>
+                <th className={th}>Delivery</th>
+                <th className={cn(th, 'hidden lg:table-cell')}>Lands in (Ontology ETL)</th>
+                <th className={cn(th, 'text-right w-24')}>Artifacts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.input_feeds || []).map(feed => (
+                <tr key={feed.id || feed.name} className="border-b border-border last:border-b-0">
+                  <td className={td}>
+                    <div className="font-medium">{feed.name}</div>
+                    {!!feed.artifacts?.length && (
+                      <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                        {feed.artifacts.slice(0, 4).map((a, i) => (
+                          <li key={`${a.kind}-${i}`}>
+                            {a.kind}: {a.tableName || a.name || a.route_path || a.topic || '—'}
+                            {a.service ? ` (${a.service.toUpperCase()})` : ''}
+                          </li>
+                        ))}
+                        {(feed.artifacts.length > 4) && <li>… +{feed.artifacts.length - 4} more</li>}
+                      </ul>
+                    )}
+                  </td>
+                  <td className={cn(td, 'text-muted-foreground')}>{feed.layer || '—'}</td>
+                  <td className={cn(td, 'text-muted-foreground')}>{(feed.delivery || []).join(', ') || '—'}</td>
+                  <td className={cn(td, 'hidden text-muted-foreground lg:table-cell')}>{feed.ontology_lands_in || '—'}</td>
+                  <td className={cn(td, 'num text-right')}>{num(feed.artifact_count ?? 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableShell>
+      )}
 
       <Toolbar className="flex-wrap gap-3">
         <Chips<Layer>
@@ -203,7 +261,7 @@ export default function BillingPage() {
           loading={loading}
           showSystem
           onOpen={setOpenTable}
-          emptyText="No billing tables. Generate billing input to create atlas, legacy, and Kenan billing tables."
+          emptyText="No billing input tables yet. Generate billing input to create atlas and legacy source-side tables."
         />
       )}
 

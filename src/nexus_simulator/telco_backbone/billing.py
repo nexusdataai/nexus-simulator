@@ -59,17 +59,19 @@ def telco_backbone_profile() -> str:
     return "full" if v == "full" else "billing"
 
 
-# Legacy CRM/OSS/NSS tables (bss_crm / nss_core / oss_network) → billing atlas system_key.
+def include_kenan_final_tables() -> bool:
+    """Kenan BP destination tables (CMF, BILL_INVOICE, …) belong in Nexus Ontology after ETL — off by default."""
+    return (os.getenv("TELCO_KENAN_FINAL_TABLES") or "").strip().lower() in ("1", "true", "yes")
+
+
+# Legacy source-side tables only (input feeds) — not Kenan lands-in / bill-run outputs.
 LEGACY_BILLING_TABLES: dict[str, dict[str, dict[str, str]]] = {
     "bss": {
         "Subscriber_Profile": {"system_key": "CRM / customer master"},
         "Subscription_Plan_History": {"system_key": "Order management"},
         "Contract": {"system_key": "Subscriptions / installed base"},
-        "Invoice": {"system_key": "Billing / invoicing"},
-        "Payment": {"system_key": "Payments and collections"},
         "Prepaid_Recharge": {"system_key": "Online charging (OCS / CCS / CHF)"},
         "Care_Interaction": {"system_key": "Customer care / complaints"},
-        "Billing_Dispute": {"system_key": "Customer care / complaints"},
         "MNP_Port_Out_Request": {"system_key": "MNP / port-out"},
     },
     "nss": {
@@ -120,7 +122,7 @@ def catalog_entry_for_table(
         if leg:
             sk = leg.get("system_key")
     if sk and is_billing_system(sk):
-        applications.append("billing")
+        applications.extend(["billing", "billing_input"])
         billing_target = billing_target_for_system(sk)
     out: dict[str, Any] = {}
     if applications:
@@ -129,4 +131,6 @@ def catalog_entry_for_table(
         out["system_key"] = sk
     if billing_target:
         out["billing_target"] = billing_target
+    if schema.startswith("kenan_"):
+        out["role"] = "kenan_destination"
     return out

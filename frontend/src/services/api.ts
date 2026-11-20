@@ -301,7 +301,33 @@ export interface BillingLayerBundle {
   totals?: { tables?: number; rows?: number; files?: number; apis?: number; streams?: number };
 }
 
+export interface BillingInputFeed {
+  id?: string;
+  name?: string;
+  layer?: string;
+  delivery?: string[];
+  format?: string;
+  ontology_lands_in?: string;
+  tmf_sid?: string;
+  artifact_count?: number;
+  artifacts?: {
+    kind?: string;
+    service?: string;
+    schemaName?: string;
+    tableName?: string;
+    path?: string;
+    name?: string;
+    route_path?: string;
+    method?: string;
+    topic?: string;
+    system_key?: string | null;
+    rowCount?: number;
+  }[];
+}
+
 export interface BillingOverview {
+  ontology_etl_note?: string;
+  input_feeds?: BillingInputFeed[];
   layers?: Record<string, BillingLayerBundle>;
   tables: (TableRef & { service: string; schema?: string; table?: string; rows?: number; layer?: string })[];
   files?: { name?: string; path?: string; system_key?: string | null; service?: string }[];
@@ -313,6 +339,8 @@ export interface BillingOverview {
     files?: number;
     apis?: number;
     streams?: number;
+    input_feeds?: number;
+    input_feeds_with_data?: number;
     by_layer?: {
       tables: Record<string, number>;
       rows: Record<string, number>;
