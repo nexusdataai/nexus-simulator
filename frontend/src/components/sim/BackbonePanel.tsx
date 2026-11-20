@@ -264,7 +264,6 @@ export function BackbonePanel({ sim, billingOnly }: { sim: SimulatorDef; billing
   const billingRows = (list: TableListRow[]) =>
     module === 'billing' ? list.filter(t => t.applications?.includes('billing')) : list;
   const atlasTables = billingRows(allTables.filter(t => t.schemaName === atlasSchema));
-  const kenanTables = billingRows(allTables.filter(t => t.schemaName === 'kenan_bp'));
   const files = React.useMemo(
     () => (sum?.files || []).filter(f => isBillingFamily(f.system_key)),
     [sum?.files, billingOnly, billingFamilies],
@@ -410,7 +409,7 @@ export function BackbonePanel({ sim, billingOnly }: { sim: SimulatorDef; billing
         {(view === 'generated' || view === 'all') && (
           <TableList
             key={view}
-            rows={view === 'generated' ? [...atlasTables, ...kenanTables] : billingRows(allTables)}
+            rows={view === 'generated' ? atlasTables : billingRows(allTables.filter(t => t.schemaName !== 'kenan_bp'))}
             loading={objects.loading}
             onOpen={setOpenTable}
             emptyText={view === 'generated' ? `Nothing generated in ${atlasSchema || 'the atlas schema'} yet. Configure the backbone with Table delivery, then Generate.` : 'This system has no tables yet.'}

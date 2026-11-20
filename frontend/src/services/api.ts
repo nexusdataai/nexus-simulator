@@ -72,7 +72,7 @@ export interface TableRef {
   tableName: string;
   columnCount?: number | null;
   rowCount?: number | null;
-  /** e.g. ``billing`` — Kenan BP–relevant tables from Telco-Data. */
+  /** e.g. ``billing`` — inbound billing input tables from Telco-Data. */
   applications?: string[];
   billing_target?: string | null;
   system_key?: string | null;

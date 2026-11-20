@@ -305,12 +305,6 @@ class TelcoBackboneMixin:
         }.get(svc_name, f"{svc_name}_core")
 
         merged: Dict[str, Dict[str, List[dict]]] = {base_schema: legacy_map, atlas_schema: atlas_tables}
-        from nexus_simulator.telco_backbone.billing import include_kenan_final_tables
-
-        if svc_name == "bss" and include_legacy_tables and include_kenan_final_tables():
-            from nexus_simulator.plugins.kenan_bp_tables import build_kenan_bp_tables
-
-            merged["kenan_bp"] = build_kenan_bp_tables(pool)
         server = getattr(self, "SERVER_NAME", f"{svc_name}_simulator")
         summary = await self._finalize_seed_multi(server, merged)
         await self._persist_table_catalog(atlas_schema, base_schema, atlas_tables, tbl_src=backbone.get("table_sources"))
@@ -574,6 +568,8 @@ class TelcoBackboneMixin:
         cat: dict = raw if isinstance(raw, dict) else {}
         out: list[dict[str, Any]] = []
         for row in base:
+            if str(row.get("schemaName") or "") == "kenan_bp":
+                continue
             key = f"{row.get('schemaName')}.{row.get('tableName')}"
             meta = cat.get(key) or catalog_entry_for_table(
                 self.SERVICE_NAME,

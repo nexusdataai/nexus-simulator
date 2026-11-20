@@ -59,10 +59,9 @@ function BillingHelpDialog({ feeds, ontologyNote }: { feeds: BillingInputFeed[];
         <div className="space-y-4 text-sm text-muted-foreground">
           {ontologyNote && <p className="text-foreground/90">{ontologyNote}</p>}
           <p>
-            Kenan BP <strong className="font-medium text-foreground">final tables</strong> (CMF, CDR_DATA, BILL_INVOICE, …) are
-            built in Nexus Ontology ETL — see{' '}
+            Final billing tables (CMF, CDR_DATA, BILL_INVOICE, …) are built in Nexus Ontology ETL — see{' '}
             <Link to="/telco-atlas/kenan.html" className="text-primary hover:underline dark:text-brand-hi">
-              Kenan reference
+              billing tables reference
             </Link>
             .
           </p>

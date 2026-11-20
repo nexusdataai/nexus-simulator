@@ -5,7 +5,6 @@
     "billing": {
       "label": "Billing",
       "application": "billing",
-      "kenan_bp": true,
       "systems": {
         "CRM / customer master": "Accounts, bill address, hierarchy → CMF, EXTERNAL_ID_ACCT_MAP",
         "Product catalog": "Plans, prices, discounts → RATE_RC, RATE_USAGE, USAGE_TYPES, DISCOUNT_DEFINITIONS",

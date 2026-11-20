@@ -16,13 +16,8 @@ Reference definitions live in `data/Telco-Data/kenan.html` / `kenan.js` (inbound
 
 `ontology_lands_in` on each feed documents where Ontology ETL lands data; the simulator does **not** create those tables by default.
 
-## Optional Kenan final tables (dev only)
-
-Set `TELCO_KENAN_FINAL_TABLES=true` to also seed synthetic `kenan_bp.*` tables on BSS (legacy demo). Production-style flows should keep this **off**.
-
 ## Environment
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `TELCO_BACKBONE_PROFILE` | `billing` | Limit backbone generation to billing-relevant atlas families. |
-| `TELCO_KENAN_FINAL_TABLES` | off | When true, BSS also seeds Kenan destination tables in `kenan_bp` schema. |

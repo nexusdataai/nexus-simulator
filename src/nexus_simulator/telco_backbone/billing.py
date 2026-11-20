@@ -1,4 +1,4 @@
-"""Billing module metadata aligned with Telco-Data / Kenan BP."""
+"""Billing module metadata aligned with Telco-Data inbound billing feeds."""
 
 from __future__ import annotations
 
@@ -54,17 +54,12 @@ def is_billing_system(system_key: str) -> bool:
 
 
 def telco_backbone_profile() -> str:
-    """``billing`` limits default telco seed to Kenan-relevant families; ``full`` generates all atlas systems."""
+    """``billing`` limits default telco seed to billing-relevant families; ``full`` generates all atlas systems."""
     v = (os.getenv("TELCO_BACKBONE_PROFILE") or "billing").strip().lower()
     return "full" if v == "full" else "billing"
 
 
-def include_kenan_final_tables() -> bool:
-    """Kenan BP destination tables (CMF, BILL_INVOICE, …) belong in Nexus Ontology after ETL — off by default."""
-    return (os.getenv("TELCO_KENAN_FINAL_TABLES") or "").strip().lower() in ("1", "true", "yes")
-
-
-# Legacy source-side tables only (input feeds) — not Kenan lands-in / bill-run outputs.
+# Legacy source-side tables only (billing input feeds).
 LEGACY_BILLING_TABLES: dict[str, dict[str, dict[str, str]]] = {
     "bss": {
         "Subscriber_Profile": {"system_key": "CRM / customer master"},
@@ -85,21 +80,6 @@ LEGACY_BILLING_TABLES: dict[str, dict[str, dict[str, str]]] = {
     },
 }
 
-KENAN_BILLING_TABLES: dict[str, dict[str, str]] = {
-    "CMF": {"system_key": "CRM / customer master", "module": "kenan"},
-    "EXTERNAL_ID_ACCT_MAP": {"system_key": "CRM / customer master", "module": "kenan"},
-    "SERVICE": {"system_key": "Subscriptions / installed base", "module": "kenan"},
-    "PRODUCT": {"system_key": "Subscriptions / installed base", "module": "kenan"},
-    "RATE_USAGE": {"system_key": "Product catalog", "module": "kenan"},
-    "RATE_RC": {"system_key": "Product catalog", "module": "kenan"},
-    "CDR_DATA": {"system_key": "Mediation", "module": "kenan"},
-    "BILL_INVOICE": {"system_key": "Billing / invoicing", "module": "kenan"},
-    "BILL_INVOICE_DETAIL": {"system_key": "Billing / invoicing", "module": "kenan"},
-    "BMF": {"system_key": "Payments and collections", "module": "kenan"},
-    "PAYMENT_TRANS": {"system_key": "Payments and collections", "module": "kenan"},
-    "ADJ": {"system_key": "Customer care / complaints", "module": "kenan"},
-}
-
 
 def catalog_entry_for_table(
     service: str,
@@ -111,18 +91,12 @@ def catalog_entry_for_table(
     applications: list[str] = []
     billing_target: str | None = None
     sk = system_key
-    if schema.startswith("kenan_"):
-        meta = KENAN_BILLING_TABLES.get(table)
-        if meta:
-            sk = sk or meta.get("system_key")
-            applications.append("billing")
-            applications.append("kenan")
     if not sk:
         leg = (LEGACY_BILLING_TABLES.get(service) or {}).get(table)
         if leg:
             sk = leg.get("system_key")
     if sk and is_billing_system(sk):
-        applications.extend(["billing", "billing_input"])
+        applications.append("billing")
         billing_target = billing_target_for_system(sk)
     out: dict[str, Any] = {}
     if applications:
@@ -131,6 +105,4 @@ def catalog_entry_for_table(
         out["system_key"] = sk
     if billing_target:
         out["billing_target"] = billing_target
-    if schema.startswith("kenan_"):
-        out["role"] = "kenan_destination"
     return out

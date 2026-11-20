@@ -7,11 +7,7 @@ import pytest
 from nexus_simulator.config import BSSPluginConfig, SimulatorConfig
 from nexus_simulator.factory import build_simulator
 from nexus_simulator.plugins.telco_seed_pools import clear_telco_pools_cache, get_telco_pools
-from nexus_simulator.telco_backbone.billing import (
-    billing_system_keys_for_layer,
-    include_kenan_final_tables,
-    is_billing_system,
-)
+from nexus_simulator.telco_backbone.billing import billing_system_keys_for_layer, is_billing_system
 
 
 @pytest.fixture(autouse=True)
@@ -21,13 +17,12 @@ def _small_pools(monkeypatch):
     monkeypatch.setenv("TELCO_HISTORY_DAYS", "14")
     monkeypatch.setenv("TELCO_SEED", "11")
     monkeypatch.setenv("TELCO_BACKBONE_PROFILE", "billing")
-    monkeypatch.delenv("TELCO_KENAN_FINAL_TABLES", raising=False)
     clear_telco_pools_cache()
     yield
     clear_telco_pools_cache()
 
 
-def test_billing_system_keys_cover_kenan_feeds():
+def test_billing_system_keys_cover_feeds():
     assert is_billing_system("Billing / invoicing")
     bss = billing_system_keys_for_layer("BSS")
     assert "CRM / customer master" in bss
@@ -37,35 +32,18 @@ def test_billing_system_keys_cover_kenan_feeds():
 
 
 @pytest.mark.asyncio
-async def test_bss_billing_seed_input_only_no_kenan():
-    assert not include_kenan_final_tables()
+async def test_bss_billing_seed_marks_billing_only():
     sim = build_simulator(SimulatorConfig(bss=BSSPluginConfig()))
     svc = sim.bss
     assert svc is not None
     pools = get_telco_pools()
     await svc.generate_backbone(pools=pools, include_legacy_tables=True)
     objects = await svc.get_object_list()
-    billing_input = [
-        o
-        for o in objects
-        if (o.get("applications") or [])
-        and ("billing_input" in o["applications"] or "billing" in o["applications"])
-    ]
-    assert billing_input
-    kenan = [o for o in objects if o.get("schemaName") == "kenan_bp"]
-    assert not kenan
-
-
-@pytest.mark.asyncio
-async def test_bss_kenan_final_tables_optional(monkeypatch):
-    monkeypatch.setenv("TELCO_KENAN_FINAL_TABLES", "true")
-    sim = build_simulator(SimulatorConfig(bss=BSSPluginConfig()))
-    pools = get_telco_pools()
-    await sim.bss.generate_backbone(pools=pools, include_legacy_tables=True)
-    objects = await sim.bss.get_object_list()
-    kenan = [o for o in objects if o.get("schemaName") == "kenan_bp"]
-    assert kenan
-    assert any(o.get("tableName") == "CMF" for o in kenan)
+    billing = [o for o in objects if (o.get("applications") or []) and "billing" in o["applications"]]
+    assert billing
+    assert not any("kenan" in (o.get("applications") or []) for o in objects)
+    kenan_bp = [o for o in objects if o.get("schemaName") == "kenan_bp"]
+    assert not kenan_bp
 
 
 @pytest.mark.asyncio

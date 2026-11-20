@@ -25,7 +25,7 @@ class SeedAllResponse(BaseModel):
 
 @router.post("/seed-billing", response_model=SeedAllResponse)
 async def seed_billing(request: Request):
-    """Seed BSS → NSS → OSS with billing **input** families only (no Kenan final tables unless TELCO_KENAN_FINAL_TABLES=true)."""
+    """Seed BSS → NSS → OSS with billing input families only (no final bill-run tables in the simulator)."""
     import os
 
     prev = os.environ.get("TELCO_BACKBONE_PROFILE")

@@ -148,9 +148,6 @@ export function TableList({ rows, loading, showSystem, onOpen, filters, emptyTex
                     {r.applications?.includes('billing') && (
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         <span className="rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-primary">Billing</span>
-                        {r.applications.includes('kenan') && (
-                          <span className="rounded border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Kenan</span>
-                        )}
                       </div>
                     )}
                   </td>

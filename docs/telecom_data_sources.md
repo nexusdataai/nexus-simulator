@@ -218,7 +218,7 @@ The Simulators UI (**BSS / NSS / OSS** tabs) uses the catalog matrix and POSTs `
 
 **Ordered seed:** `POST /api/v1/telco/seed-all` runs **BSS → NSS → OSS** by default. Optional query params `include_golden=true` and/or `include_sources=true` add `telco_golden` and/or `telco_sources` when those plugins are enabled in config.
 
-**Billing (Kenan BP):** By default `TELCO_BACKBONE_PROFILE=billing` limits atlas generation to the product families tagged **Billing** in `data/Telco-Data`, adds a synthetic **`kenan_bp`** schema on BSS (CMF, CDR_DATA, BILL_INVOICE, …), and tags billing-related tables in the catalog API. Use `POST /api/v1/telco/seed-billing` to re-seed all telecom layers with that profile, or set `TELCO_BACKBONE_PROFILE=full` for the full atlas. In the UI, use **Application → Billing (Kenan BP)** on the Tables page, or the backbone **Billing module only** preset.
+**Billing:** By default `TELCO_BACKBONE_PROFILE=billing` limits atlas generation to product families tagged **Billing** in `data/Telco-Data` and tags billing input tables in the catalog API. Use `POST /api/v1/telco/seed-billing` to re-seed BSS/NSS/OSS, or set `TELCO_BACKBONE_PROFILE=full` for the full atlas. In the UI, use **Application → Billing** on the Tables page or the **Billing** nav item.
 
 **Env knobs:** `TELCO_SUBSCRIBERS` (default 500), `TELCO_CELLS` (100), `TELCO_HISTORY_DAYS` (60), `TELCO_SEED` (42). Plan-scale demo: `TELCO_SUBSCRIBERS=5000 TELCO_CELLS=500 TELCO_HISTORY_DAYS=90`. Disable layers with `BSS_SIMULATOR_ENABLED=false` (and NSS/OSS equivalents).
 

@@ -41,10 +41,10 @@ def load_billing_feeds() -> list[dict[str, Any]]:
 
 
 def _billing_input_obj(row: dict[str, Any]) -> bool:
-    if row.get("schemaName") == "kenan_bp" or row.get("role") == "kenan_destination":
+    if row.get("schemaName") == "kenan_bp":
         return False
     apps = row.get("applications") or []
-    return "billing_input" in apps or "billing" in apps
+    return "billing" in apps
 
 
 def _billing_sk(sk: str | None, layer: str) -> bool:
