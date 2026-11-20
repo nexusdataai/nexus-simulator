@@ -288,9 +288,23 @@ export interface BillingFeed {
   linked_tables?: { service: string; schema?: string; table?: string; rows?: number }[];
 }
 
+export interface BillingLayerBundle {
+  service: string;
+  layer: string;
+  run_id?: string | null;
+  generated_at?: string | null;
+  tables: (TableRef & { service?: string; layer?: string; system_key?: string | null; rowCount?: number })[];
+  files: { path?: string; name?: string; system_key?: string | null; service?: string }[];
+  apis: { route_path?: string; method?: string; system_key?: string | null; service?: string }[];
+  streams: { topic?: string; event_count?: number; system_key?: string | null; service?: string }[];
+  systems?: { system_key: string; row_count?: number; table_count?: number; has_backbone_data?: boolean }[];
+  totals?: { tables?: number; rows?: number; files?: number; apis?: number; streams?: number };
+}
+
 export interface BillingOverview {
   feeds: BillingFeed[];
-  tables: (TableRef & { service: string; schema?: string; table?: string; rows?: number })[];
+  layers?: Record<string, BillingLayerBundle>;
+  tables: (TableRef & { service: string; schema?: string; table?: string; rows?: number; layer?: string })[];
   totals?: {
     feeds: number;
     tables: number;

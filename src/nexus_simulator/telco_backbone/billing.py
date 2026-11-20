@@ -78,7 +78,9 @@ LEGACY_BILLING_TABLES: dict[str, dict[str, dict[str, str]]] = {
         "USSD_Balance_Check": {"system_key": "SMSC / USSD"},
         "Policy_Throttle_Event": {"system_key": "Online charging (OCS / CCS / CHF)"},
     },
-    "oss": {},
+    "oss": {
+        "Service_Activation_Result": {"system_key": "Service orchestration & activation"},
+    },
 }
 
 KENAN_BILLING_TABLES: dict[str, dict[str, str]] = {

@@ -54,5 +54,5 @@ async def test_billing_overview_endpoint():
     pools = get_telco_pools()
     await sim.bss.generate_backbone(pools=pools, include_legacy_tables=True)
     overview = await build_billing_overview(sim)
-    assert overview.get("feeds")
+    assert overview.get("layers", {}).get("bss")
     assert overview["totals"]["tables"] >= 1

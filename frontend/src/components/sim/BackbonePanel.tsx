@@ -224,7 +224,7 @@ function ConfigureDialog({ catalog, cfg, setCfg, onClose, onGenerate, generating
 
 /* ------------------------------------------------------------------ panel */
 
-export function BackbonePanel({ sim }: { sim: SimulatorDef }) {
+export function BackbonePanel({ sim, billingOnly }: { sim: SimulatorDef; billingOnly?: boolean }) {
   const api = React.useMemo(() => systemApi(sim.apiPath), [sim.apiPath]);
   const catalog = useLoad(api.backboneCatalog, [api]);
   const status = useLoad(api.backboneStatus, [api]);
@@ -235,15 +235,29 @@ export function BackbonePanel({ sim }: { sim: SimulatorDef }) {
   const [configOpen, setConfigOpen] = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
   const [lastRun, setLastRun] = React.useState<any>(null);
-  const [view, setView] = React.useState<View>('generated');
-  const [module, setModule] = React.useState<'all' | 'billing'>('all');
+  const [view, setView] = React.useState<View>(billingOnly ? 'all' : 'generated');
+  const [module, setModule] = React.useState<'all' | 'billing'>(billingOnly ? 'billing' : 'all');
   const [q, setQ] = React.useState('');
   const [openTable, setOpenTable] = React.useState<TableListRow | null>(null);
   const [preview, setPreview] = React.useState<PreviewTarget | null>(null);
 
-  React.useEffect(() => { if (catalog.data && !cfg) setCfg(initialConfig(catalog.data)); }, [catalog.data, cfg]);
+  React.useEffect(() => {
+    if (!catalog.data) return;
+    if (!cfg) {
+      const base = initialConfig(catalog.data);
+      if (billingOnly) {
+        const billing = new Set(catalog.data.systems.filter(s => s.billing).map(s => s.system_key));
+        setCfg({ ...base, included: billing.size ? billing : base.included });
+      } else setCfg(base);
+    }
+  }, [catalog.data, cfg, billingOnly]);
 
   const cat = catalog.data;
+  const billingFamilies = React.useMemo(
+    () => new Set((cat?.systems || []).filter(s => s.billing).map(s => s.system_key)),
+    [cat],
+  );
+  const isBillingFamily = (key?: string | null) => !billingOnly || (key ? billingFamilies.has(key) : false);
   const sum = summary.data?.run_id ? summary.data : null;
   const atlasSchema = cat ? `telco_atlas_${cat.layer.toLowerCase()}` : '';
   const allTables = objects.data || [];
@@ -251,9 +265,18 @@ export function BackbonePanel({ sim }: { sim: SimulatorDef }) {
     module === 'billing' ? list.filter(t => t.applications?.includes('billing')) : list;
   const atlasTables = billingRows(allTables.filter(t => t.schemaName === atlasSchema));
   const kenanTables = billingRows(allTables.filter(t => t.schemaName === 'kenan_bp'));
-  const files = sum?.files || [];
-  const apis = sum?.apis || [];
-  const streams = sum?.streams || [];
+  const files = React.useMemo(
+    () => (sum?.files || []).filter(f => isBillingFamily(f.system_key)),
+    [sum?.files, billingOnly, billingFamilies],
+  );
+  const apis = React.useMemo(
+    () => (sum?.apis || []).filter(a => isBillingFamily(a.system_key)),
+    [sum?.apis, billingOnly, billingFamilies],
+  );
+  const streams = React.useMemo(
+    () => (sum?.streams || []).filter(s => isBillingFamily(s.system_key)),
+    [sum?.streams, billingOnly, billingFamilies],
+  );
   const vendorName = (code?: string | null) => (code ? `${cat?.vendors[code] || code} (${code})` : '—');
 
   const refresh = () => { status.reload(); summary.reload(); objects.reload(); };
@@ -366,7 +389,7 @@ export function BackbonePanel({ sim }: { sim: SimulatorDef }) {
             ]}
           />
           <ToolbarSpacer />
-          {(view === 'generated' || view === 'all') && allTables.some(t => t.applications?.includes('billing')) && (
+          {!billingOnly && (view === 'generated' || view === 'all') && allTables.some(t => t.applications?.includes('billing')) && (
             <Chips<'all' | 'billing'>
               label="Application"
               value={module}

@@ -170,6 +170,24 @@ def build_oss_tables(pools: TelcoPools) -> Dict[str, List[dict]]:
                 }
             )
 
+    activations: List[dict] = []
+    act_id = 0
+    for cid in pools.customer_ids:
+        if rng.random() < 0.25 or cid in pools.persona_upsell_ready:
+            act_id += 1
+            activations.append(
+                {
+                    "activation_id": f"ACT-{act_id:07d}",
+                    "customer_id": cid,
+                    "cell_id": pools.home_cell_by_customer[cid],
+                    "order_id": f"PORD-{act_id + 88000}",
+                    "service_start_date": datetime_str(pools.customer_tenure[cid] * 30, 1)[:10],
+                    "activation_status": pick(["completed", "completed", "in_progress"]),
+                    "billing_eligible": True,
+                }
+            )
+    data["Service_Activation_Result"] = activations
+
     data["Network_Alarm"] = alarms
     data["Cell_KPI_Daily"] = kpi
     data["Network_Event"] = events
