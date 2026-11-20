@@ -131,6 +131,16 @@ function ConfigureDialog({ catalog, cfg, setCfg, onClose, onGenerate, generating
           >
             Use this vendor for every family
           </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setCfg(c => {
+              const billing = new Set(catalog.systems.filter(s => s.billing).map(s => s.system_key));
+              return { ...c, included: billing.size ? billing : c.included };
+            })}
+          >
+            Billing module only (Kenan BP)
+          </Button>
         </div>
 
         <div className="scroll-thin min-h-0 flex-1 overflow-auto">
@@ -154,6 +164,12 @@ function ConfigureDialog({ catalog, cfg, setCfg, onClose, onGenerate, generating
                     <td className="px-4 py-2.5">
                       <div className={cn('font-medium', on && 'text-foreground')}>{s.system_key}</div>
                       {s.slug && <div className="font-mono text-xs text-subtle-foreground">{s.slug}</div>}
+                      {s.billing && (
+                        <div className="mt-1 text-xs text-muted-foreground" title={s.billing_target}>
+                          <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-primary">Billing</span>
+                          {s.billing_target && <span className="ml-1.5">{s.billing_target}</span>}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-2.5">
                       <select
@@ -220,6 +236,7 @@ export function BackbonePanel({ sim }: { sim: SimulatorDef }) {
   const [generating, setGenerating] = React.useState(false);
   const [lastRun, setLastRun] = React.useState<any>(null);
   const [view, setView] = React.useState<View>('generated');
+  const [module, setModule] = React.useState<'all' | 'billing'>('all');
   const [q, setQ] = React.useState('');
   const [openTable, setOpenTable] = React.useState<TableListRow | null>(null);
   const [preview, setPreview] = React.useState<PreviewTarget | null>(null);
@@ -230,7 +247,10 @@ export function BackbonePanel({ sim }: { sim: SimulatorDef }) {
   const sum = summary.data?.run_id ? summary.data : null;
   const atlasSchema = cat ? `telco_atlas_${cat.layer.toLowerCase()}` : '';
   const allTables = objects.data || [];
-  const atlasTables = allTables.filter(t => t.schemaName === atlasSchema);
+  const billingRows = (list: TableListRow[]) =>
+    module === 'billing' ? list.filter(t => t.applications?.includes('billing')) : list;
+  const atlasTables = billingRows(allTables.filter(t => t.schemaName === atlasSchema));
+  const kenanTables = billingRows(allTables.filter(t => t.schemaName === 'kenan_bp'));
   const files = sum?.files || [];
   const apis = sum?.apis || [];
   const streams = sum?.streams || [];
@@ -346,6 +366,17 @@ export function BackbonePanel({ sim }: { sim: SimulatorDef }) {
             ]}
           />
           <ToolbarSpacer />
+          {(view === 'generated' || view === 'all') && allTables.some(t => t.applications?.includes('billing')) && (
+            <Chips<'all' | 'billing'>
+              label="Application"
+              value={module}
+              onChange={setModule}
+              options={[
+                { value: 'all', label: 'All tables', count: allTables.length },
+                { value: 'billing', label: 'Billing', count: allTables.filter(t => t.applications?.includes('billing')).length },
+              ]}
+            />
+          )}
           {(view === 'files' || view === 'apis' || view === 'streams') && (
             <SearchInput value={q} onChange={setQ} placeholder={`Search ${view}`} />
           )}
@@ -356,7 +387,7 @@ export function BackbonePanel({ sim }: { sim: SimulatorDef }) {
         {(view === 'generated' || view === 'all') && (
           <TableList
             key={view}
-            rows={view === 'generated' ? atlasTables : allTables}
+            rows={view === 'generated' ? [...atlasTables, ...kenanTables] : billingRows(allTables)}
             loading={objects.loading}
             onOpen={setOpenTable}
             emptyText={view === 'generated' ? `Nothing generated in ${atlasSchema || 'the atlas schema'} yet. Configure the backbone with Table delivery, then Generate.` : 'This system has no tables yet.'}

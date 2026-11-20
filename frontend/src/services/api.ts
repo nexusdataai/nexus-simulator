@@ -72,6 +72,10 @@ export interface TableRef {
   tableName: string;
   columnCount?: number | null;
   rowCount?: number | null;
+  /** e.g. ``billing`` — Kenan BP–relevant tables from Telco-Data. */
+  applications?: string[];
+  billing_target?: string | null;
+  system_key?: string | null;
 }
 
 export interface CatalogTable extends TableRef {
@@ -93,12 +97,20 @@ export interface TableColumn {
   ordinalPosition?: number;
 }
 
-export interface BackboneSystem { system_key: string; slug?: string; deliveries: string[] }
+export interface BackboneSystem {
+  system_key: string;
+  slug?: string;
+  deliveries: string[];
+  billing?: boolean;
+  billing_target?: string;
+  applications?: string[];
+}
 export interface BackboneCatalog {
   layer: string;
   vendors: Record<string, string>;
   vendor_default: string;
   systems: BackboneSystem[];
+  billing_module?: { id: string; label: string };
 }
 export interface BackboneFile { name?: string; path?: string; system_key?: string | null; vendor_code?: string | null }
 export interface BackboneApi { method?: string; route_path?: string; system_key?: string | null; vendor_code?: string | null }
@@ -252,8 +264,13 @@ export const getSimulatorTables = (service: string) =>
       tableName: t.tableName ?? t.table,
       columnCount: t.columnCount ?? t.columns ?? null,
       rowCount: t.rowCount ?? t.rows ?? null,
+      applications: t.applications ?? undefined,
+      billing_target: t.billing_target ?? t.billingTarget ?? null,
+      system_key: t.system_key ?? t.systemKey ?? null,
     })),
   );
+
+export const seedBillingTelco = () => request<{ message?: string }>('/api/v1/telco/seed-billing', post(), LONG);
 
 export const seedAllTelco = () => request<{ message?: string }>('/api/v1/telco/seed-all', post(), LONG);
 

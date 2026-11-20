@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "source": "data/Telco-Data/index.html (BILLING map)",
+  "modules": {
+    "billing": {
+      "label": "Billing",
+      "application": "billing",
+      "kenan_bp": true,
+      "systems": {
+        "CRM / customer master": "Accounts, bill address, hierarchy → CMF, EXTERNAL_ID_ACCT_MAP",
+        "Product catalog": "Plans, prices, discounts → RATE_RC, RATE_USAGE, USAGE_TYPES, DISCOUNT_DEFINITIONS",
+        "Order management": "New lines, plan changes, disconnects → SERVICE, PRODUCT (Orders Services)",
+        "Subscriptions / installed base": "Active products, contracts → PRODUCT, contract tables",
+        "Online charging (OCS / CCS / CHF)": "Pre-rated EDRs, recharges → CDR_DATA via CAP (pre-rated usage)",
+        "Mediation": "Normalised CDR files → COM → MCAP → CAP → LTP → CDR_DATA",
+        "Billing / invoicing": "Bill run output: BILL_INVOICE, BILL_INVOICE_DETAIL, CMF_BALANCE, BILL_IMAGE",
+        "Payments and collections": "Payments, dunning → BMF, PAYMENT_TRANS (LBX / CPM / EFT), ARM_*",
+        "Customer care / complaints": "Disputes, goodwill credits → ADJ, CMF_BALANCE.dispute_amt",
+        "MNP / port-out": "Port-out disconnect → final bill (SERVICE / PRODUCT inactive dates)",
+        "Service orchestration & activation": "Activation result sets service start date → Orders Services",
+        "MSC / MSS (2G / 3G voice)": "Voice CDRs → mediation → CDR_DATA",
+        "Packet gateway (SGW / PGW / SMF / UPF)": "Data session CDRs → mediation → CDR_DATA",
+        "IMS / VoLTE / VoWiFi": "VoLTE CDRs → mediation → CDR_DATA",
+        "SMSC / USSD": "SMS records → mediation → CDR_DATA",
+        "Roaming (TAP / RAP)": "TAP files → TIP → CDR_DATA (incollect), CDR_OUTCOLLECTS"
+      }
+    }
+  }
+}

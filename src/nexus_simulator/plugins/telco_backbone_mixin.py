@@ -11,6 +11,13 @@ from loguru import logger
 
 from nexus_simulator.plugins.telco_seed_pools import TelcoPools, get_telco_pools, telco_rng_seed
 from nexus_simulator.telco_backbone.atlas_catalog import default_vendor_for_layer, load_atlas_catalog
+from nexus_simulator.telco_backbone.billing import (
+    billing_system_keys_for_layer,
+    billing_target_for_system,
+    catalog_entry_for_table,
+    is_billing_system,
+    telco_backbone_profile,
+)
 from nexus_simulator.telco_backbone.fixtures import load_sample_fixtures
 from nexus_simulator.telco_backbone.generate import generate_layer_backbone
 from nexus_simulator.telco_backbone.stream_publisher import publish_backbone_streams
@@ -85,18 +92,23 @@ class TelcoBackboneMixin:
                     merged = sorted(fx_del)
             else:
                 merged = sorted(fx_del)
-            rows.append(
-                {
-                    "system_key": k,
-                    "slug": slug,
-                    "deliveries": merged,
-                }
-            )
+            bill = is_billing_system(k)
+            row = {
+                "system_key": k,
+                "slug": slug,
+                "deliveries": merged,
+                "billing": bill,
+            }
+            if bill:
+                row["billing_target"] = billing_target_for_system(k)
+                row["applications"] = ["billing"]
+            rows.append(row)
         return {
             "layer": layer,
             "vendors": dict(atlas.vendors),
             "vendor_default": default_vendor_for_layer(lk),
             "systems": rows,
+            "billing_module": {"id": "billing", "label": "Billing"},
         }
 
     async def _write_backbone_to_storage(
@@ -201,11 +213,17 @@ class TelcoBackboneMixin:
         system_vendors: Optional[Dict[str, str]] = None,
         vendor_code: Optional[str] = None,
         include_legacy_tables: bool = True,
+        legacy_profile: str | None = None,
     ) -> dict[str, Any]:
         """Build atlas tables + files + vendor API index + streams; merge with optional legacy seed."""
         layer = self._layer_upper()
         svc_name = self.SERVICE_NAME
         pool = pools or get_telco_pools(seed=telco_rng_seed())
+        profile = (legacy_profile or telco_backbone_profile()).strip().lower()
+        if systems is None and profile == "billing":
+            billing_keys = billing_system_keys_for_layer(layer)
+            if billing_keys:
+                systems = billing_keys
         default_vid = default_vendor_for_layer(svc_name)
         vid_in = (vendor_code or "").strip().upper()[:1] or None
         sys_arg = systems
@@ -274,6 +292,12 @@ class TelcoBackboneMixin:
         mod = import_module(f"nexus_simulator.plugins.{svc_name}.tables")
         build_fn = getattr(mod, build_fn_name)
         legacy_map = build_fn(pool) if include_legacy_tables else {}
+        if include_legacy_tables and profile == "billing":
+            from nexus_simulator.telco_backbone.billing import LEGACY_BILLING_TABLES
+
+            allowed = set((LEGACY_BILLING_TABLES.get(svc_name) or {}).keys())
+            if allowed:
+                legacy_map = {k: v for k, v in legacy_map.items() if k in allowed}
         base_schema = getattr(self, "LEGACY_SCHEMA", None) or {
             "bss": "bss_crm",
             "nss": "nss_core",
@@ -281,8 +305,13 @@ class TelcoBackboneMixin:
         }.get(svc_name, f"{svc_name}_core")
 
         merged: Dict[str, Dict[str, List[dict]]] = {base_schema: legacy_map, atlas_schema: atlas_tables}
+        if svc_name == "bss" and include_legacy_tables:
+            from nexus_simulator.plugins.kenan_bp_tables import build_kenan_bp_tables
+
+            merged["kenan_bp"] = build_kenan_bp_tables(pool)
         server = getattr(self, "SERVER_NAME", f"{svc_name}_simulator")
         summary = await self._finalize_seed_multi(server, merged)
+        await self._persist_table_catalog(atlas_schema, base_schema, atlas_tables, tbl_src=backbone.get("table_sources"))
 
         s3_info = await self._write_backbone_to_storage(run_id, generated_at, backbone, merged)
         enriched_va = s3_info.pop("vendor_api_index", None) if isinstance(s3_info, dict) else None
@@ -303,6 +332,7 @@ class TelcoBackboneMixin:
         sm["backbone"] = {
             "run_id": run_id,
             "generated_at": generated_at,
+            "profile": profile,
             "vendor_code": backbone.get("vendor_code"),
             "vendor_label": backbone.get("vendor_label"),
             "systems": len(backbone.get("systems") or []),
@@ -349,6 +379,7 @@ class TelcoBackboneMixin:
         for tname, rows in tmap.items():
             sk = str(tbl_src.get(tname) or "")
             vc = psv.get(sk) if sk else None
+            meta = catalog_entry_for_table(self.SERVICE_NAME, atlas_schema, tname, system_key=sk or None)
             tbl_rows.append(
                 {
                     "schema": atlas_schema,
@@ -356,6 +387,7 @@ class TelcoBackboneMixin:
                     "rows": len(rows or []),
                     "system_key": sk or None,
                     "vendor_code": vc,
+                    **meta,
                 }
             )
         api_rows = []
@@ -509,3 +541,49 @@ class TelcoBackboneMixin:
         layer = self._layer_upper()
         pub = await publish_backbone_streams(layer, streams)
         return {"scenario": name, "stream_topics": list(streams.keys()), "stream_publish": pub}
+
+    async def _persist_table_catalog(
+        self,
+        atlas_schema: str,
+        legacy_schema: str,
+        atlas_tables: dict[str, list],
+        *,
+        tbl_src: dict | None,
+    ) -> None:
+        catalog: dict[str, dict] = {}
+        src = tbl_src or {}
+        for tname, _rows in (atlas_tables or {}).items():
+            sk = str(src.get(tname) or "")
+            key = f"{atlas_schema}.{tname}"
+            catalog[key] = catalog_entry_for_table(
+                self.SERVICE_NAME, atlas_schema, tname, system_key=sk or None
+            )
+        if self.SERVICE_NAME == "bss":
+            from nexus_simulator.telco_backbone.billing import KENAN_BILLING_TABLES
+
+            for tname in KENAN_BILLING_TABLES:
+                key = f"kenan_bp.{tname}"
+                catalog[key] = catalog_entry_for_table(self.SERVICE_NAME, "kenan_bp", tname)
+        for t in self._tables or []:
+            key = f"{t.schema_name}.{t.table_name}"
+            if key in catalog:
+                continue
+            catalog[key] = catalog_entry_for_table(self.SERVICE_NAME, t.schema_name, t.table_name)
+
+        await self._cache_set_json(self._meta_prefix() + "table_catalog", catalog)
+
+    async def get_object_list(self) -> list[dict[str, Any]]:
+        base = await super().get_object_list()
+        raw = await self._cache_get_json(self._meta_prefix() + "table_catalog")
+        cat: dict = raw if isinstance(raw, dict) else {}
+        out: list[dict[str, Any]] = []
+        for row in base:
+            key = f"{row.get('schemaName')}.{row.get('tableName')}"
+            meta = cat.get(key) or catalog_entry_for_table(
+                self.SERVICE_NAME,
+                str(row.get("schemaName") or ""),
+                str(row.get("tableName") or ""),
+            )
+            merged = {**row, **meta}
+            out.append(merged)
+        return out

@@ -17,6 +17,9 @@ export interface TableListRow {
   tableName: string;
   columnCount?: number | null;
   rowCount?: number | null;
+  applications?: string[];
+  billing_target?: string | null;
+  system_key?: string | null;
 }
 
 type SortKey = 'rows' | 'name' | 'columns';
@@ -50,7 +53,12 @@ export function TableList({ rows, loading, showSystem, onOpen, filters, emptyTex
     const out = rows.filter(r => {
       if (hideEmpty && !r.rowCount) return false;
       if (!needle) return true;
-      return `${r.service || ''} ${r.schemaName} ${r.tableName}`.toLowerCase().includes(needle);
+      const extra = [
+        r.billing_target,
+        r.system_key,
+        ...(r.applications || []),
+      ].filter(Boolean).join(' ');
+      return `${r.service || ''} ${r.schemaName} ${r.tableName} ${extra}`.toLowerCase().includes(needle);
     });
     const dir = asc ? 1 : -1;
     out.sort((a, b) => {
@@ -135,7 +143,17 @@ export function TableList({ rows, loading, showSystem, onOpen, filters, emptyTex
                       <span className="inline-flex items-center gap-2 text-muted-foreground"><SystemLogo system={sim?.logo || r.service} size="sm" />{sim?.short || r.service}</span>
                     </td>
                   )}
-                  <td className="max-w-[320px] truncate px-4 py-2.5 font-medium text-foreground group-hover:text-primary dark:group-hover:text-brand-hi">{r.tableName}</td>
+                  <td className="max-w-[320px] px-4 py-2.5">
+                    <div className="truncate font-medium text-foreground group-hover:text-primary dark:group-hover:text-brand-hi">{r.tableName}</div>
+                    {r.applications?.includes('billing') && (
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-primary">Billing</span>
+                        {r.applications.includes('kenan') && (
+                          <span className="rounded border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Kenan</span>
+                        )}
+                      </div>
+                    )}
+                  </td>
                   <td className="hidden px-4 py-2.5 font-mono text-xs text-muted-foreground md:table-cell">{r.schemaName}</td>
                   <td className="num px-4 py-2.5 text-right text-muted-foreground">{num(r.columnCount)}</td>
                   <td className={cn('num px-4 py-2.5 text-right', r.rowCount ? 'text-foreground' : 'text-subtle-foreground')}>{num(r.rowCount ?? 0)}</td>

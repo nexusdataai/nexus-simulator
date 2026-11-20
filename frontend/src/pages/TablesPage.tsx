@@ -13,6 +13,7 @@ export default function TablesPage() {
   const [pending, setPending] = React.useState(SIMULATORS.length);
   const [failed, setFailed] = React.useState<string[]>([]);
   const [system, setSystem] = React.useState('all');
+  const [module, setModule] = React.useState<'all' | 'billing'>('all');
   const [openTable, setOpenTable] = React.useState<TableListRow | null>(null);
   const [attempt, setAttempt] = React.useState(0);
 
@@ -35,7 +36,18 @@ export default function TablesPage() {
     return m;
   }, [tables]);
 
-  const rows = React.useMemo(() => (system === 'all' ? tables : tables.filter(t => t.service === system)), [tables, system]);
+  const telecomServices = React.useMemo(() => new Set(['bss', 'nss', 'oss']), []);
+  const billingCount = React.useMemo(
+    () => tables.filter(t => telecomServices.has(t.service) && t.applications?.includes('billing')).length,
+    [tables, telecomServices],
+  );
+  const rows = React.useMemo(() => {
+    let list = system === 'all' ? tables : tables.filter(t => t.service === system);
+    if (module === 'billing') {
+      list = list.filter(t => t.applications?.includes('billing'));
+    }
+    return list;
+  }, [tables, system, module]);
   const withData = tables.filter(t => t.rowCount).length;
   const openSim = simByService(openTable?.service);
   const source = React.useMemo(() => (openSim ? systemApi(openSim.apiPath) : undefined), [openSim]);
@@ -53,15 +65,28 @@ export default function TablesPage() {
         <InlineError onRetry={() => setAttempt(a => a + 1)}>Could not read the tables of {failed.join(', ')}.</InlineError>
       )}
 
-      <Chips
-        label="System"
-        value={system}
-        onChange={setSystem}
-        options={[
-          { value: 'all', label: 'All systems', count: withData },
-          ...SIMULATORS.map(s => ({ value: s.service, label: s.short, count: counts.get(s.service) || 0 })),
-        ]}
-      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
+        <Chips
+          label="System"
+          value={system}
+          onChange={setSystem}
+          options={[
+            { value: 'all', label: 'All systems', count: withData },
+            ...SIMULATORS.map(s => ({ value: s.service, label: s.short, count: counts.get(s.service) || 0 })),
+          ]}
+        />
+        {billingCount > 0 && (
+          <Chips<'all' | 'billing'>
+            label="Application"
+            value={module}
+            onChange={setModule}
+            options={[
+              { value: 'all', label: 'All data', count: tables.length },
+              { value: 'billing', label: 'Billing (Kenan BP)', count: billingCount },
+            ]}
+          />
+        )}
+      </div>
 
       <TableList rows={rows} loading={pending > 0} showSystem={system === 'all'} onOpen={setOpenTable} />
 

@@ -54,6 +54,10 @@ h1 { font-family: var(--font-display); font-stretch: 82%; font-weight: 800; font
 #q:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button.chip { font: 500 12px var(--font-body); border: 1px solid var(--line); background: var(--bg); color: var(--muted); padding: 4px 10px; border-radius: 999px; cursor: pointer; }
 button.chip[aria-pressed="true"] { background: var(--accent-soft); color: var(--fg); border-color: var(--accent); }
+button.chip.m[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.billtag { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+.billtag .bt { align-self: flex-start; font: 600 10.5px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
+.billtag .bn { font: 400 11.5px var(--font-body); color: var(--muted); line-height: 1.35; }
 button.chip.d[aria-pressed="true"][data-d="Table"] { background: var(--d-table-bg); border-color: var(--d-table); color: var(--d-table); }
 button.chip.d[aria-pressed="true"][data-d="File"] { background: var(--d-file-bg); border-color: var(--d-file); color: var(--d-file); }
 button.chip.d[aria-pressed="true"][data-d="API"] { background: var(--d-api-bg); border-color: var(--d-api); color: var(--d-api); }
@@ -418,6 +422,7 @@ ol.stream code { word-break: break-word; }
     <div class="grp"><label class="lbl" for="q">Search</label><input id="q" type="search" placeholder="e.g. CDR, TMF635, Siebel"></div>
     <div class="grp" id="vendors"><span class="lbl">Vendors</span></div>
     <div class="grp" id="deliv"><span class="lbl">Delivery</span></div>
+    <div class="grp" id="module"><span class="lbl">Module</span></div>
     <button class="reset" id="reset" type="button">Clear filters</button>
     <button class="reset" id="expand" type="button">Open all samples</button>
   </div>
@@ -434,6 +439,7 @@ ol.stream code { word-break: break-word; }
 <script src="tmf-entities.js"></script>
 <script src="layers.js"></script>
 <script src="physical.js"></script>
+<script src="kenan.js"></script>
 <script>
 const VENDORS = [
   ["H","Huawei"],["N","Nokia"],["E","Ericsson"],["A","Amdocs"],["S","Salesforce"],["O","Oracle"],["X","Others"]
@@ -628,26 +634,50 @@ const NOTES = [
  ["OSS has no subscriber key","Every OSS row joins to a subscriber through cell ID (from MME / AMF or probe location) plus a time window. In TMF terms this is the link between Resource and Service / Product."],
 ];
 
+
+/* Systems whose data the billing module (Kenan BP) uses, with the Kenan intake and target tables. */
+const BILLING = {
+ "CRM / customer master":"Accounts, bill address, hierarchy → CMF, EXTERNAL_ID_ACCT_MAP",
+ "Product catalog":"Plans, prices, discounts → RATE_RC, RATE_USAGE, USAGE_TYPES, DISCOUNT_DEFINITIONS",
+ "Order management":"New lines, plan changes, disconnects → SERVICE, PRODUCT (Orders Services)",
+ "Subscriptions / installed base":"Active products, contracts → PRODUCT, contract tables",
+ "Online charging (OCS / CCS / CHF)":"Pre-rated EDRs, recharges → CDR_DATA via CAP (pre-rated usage)",
+ "Mediation":"Normalised CDR files → COM → MCAP → CAP → LTP → CDR_DATA",
+ "Billing / invoicing":"Bill run output: BILL_INVOICE, BILL_INVOICE_DETAIL, CMF_BALANCE, BILL_IMAGE",
+ "Payments and collections":"Payments, dunning → BMF, PAYMENT_TRANS (LBX / CPM / EFT), ARM_*",
+ "Customer care / complaints":"Disputes, goodwill credits → ADJ, CMF_BALANCE.dispute_amt",
+ "MNP / port-out":"Port-out disconnect → final bill (SERVICE / PRODUCT inactive dates)",
+ "Service orchestration & activation":"Activation result sets service start date → Orders Services",
+ "MSC / MSS (2G / 3G voice)":"Voice CDRs → mediation → CDR_DATA",
+ "Packet gateway (SGW / PGW / SMF / UPF)":"Data session CDRs → mediation → CDR_DATA",
+ "IMS / VoLTE / VoWiFi":"VoLTE CDRs → mediation → CDR_DATA",
+ "SMSC / USSD":"SMS records → mediation → CDR_DATA",
+ "Roaming (TAP / RAP)":"TAP files → TIP → CDR_DATA (incollect), CDR_OUTCOLLECTS",
+};
+const MODULES = [["billing","Billing"]];
+
 const SECTIONS = [
  {id:"bss", n:"1", title:"BSS", sub:"Customer, commercial and money.", rows:BSS},
  {id:"oss", n:"2", title:"OSS", sub:"Network management and assurance.", rows:OSS},
  {id:"nss", n:"3", title:"NSS / core network", sub:"Subscriber, session and usage.", rows:NSS},
 ];
 
-const state = { q:"", vendors:new Set(VENDORS.map(v=>v[0])), deliv:new Set() };
+const state = { q:"", vendors:new Set(VENDORS.map(v=>v[0])), deliv:new Set(), module:new Set() };
+[...BSS, ...OSS, ...NSS].forEach(r => { if (BILLING[r.sys]) r.bill = BILLING[r.sys]; });
 try { const s = JSON.parse(localStorage.getItem("atlas-filters")||"null");
-  if (s) { state.vendors = new Set(s.vendors); state.deliv = new Set(s.deliv); } } catch(e) {}
-function save(){ try { localStorage.setItem("atlas-filters", JSON.stringify({vendors:[...state.vendors], deliv:[...state.deliv]})); } catch(e) {} }
+  if (s) { state.vendors = new Set(s.vendors); state.deliv = new Set(s.deliv); state.module = new Set(s.module || []); } } catch(e) {}
+function save(){ try { localStorage.setItem("atlas-filters", JSON.stringify({vendors:[...state.vendors], deliv:[...state.deliv], module:[...state.module]})); } catch(e) {} }
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function hi(s){ const t = esc(s); if(!state.q) return t;
   const q = state.q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); return t.replace(new RegExp("("+q+")","ig"),"<mark>$1</mark>"); }
 
-function rowText(r){ return [r.sys, ...Object.values(r.v), r.data, r.fmt, r.del.join(" "), r.dn||"", r.api, r.sid].join(" ").toLowerCase(); }
+function rowText(r){ return [r.sys, ...Object.values(r.v), r.data, r.fmt, r.del.join(" "), r.dn||"", r.api, r.sid, r.bill ? "billing " + r.bill : ""].join(" ").toLowerCase(); }
 function rowVisible(r){
   const allV = state.vendors.size === VENDORS.length;
   if (!allV && !Object.keys(r.v).some(k => state.vendors.has(k))) return false;
   if (state.deliv.size && !r.del.some(d => state.deliv.has(d))) return false;
+  if (state.module.has("billing") && !r.bill) return false;
   if (state.q && !rowText(r).includes(state.q.toLowerCase())) return false;
   return true;
 }
@@ -672,6 +702,17 @@ function renderControls(){
   });
 }
 
+function renderModules(){
+  const mg = document.getElementById("module");
+  mg.querySelectorAll("button").forEach(b=>b.remove());
+  MODULES.forEach(([k,name])=>{
+    const b = document.createElement("button"); b.type="button"; b.className="chip m"; b.textContent=name;
+    b.setAttribute("aria-pressed", state.module.has(k));
+    b.onclick = ()=>{ state.module.has(k) ? state.module.delete(k) : state.module.add(k); save(); renderModules(); render(); };
+    mg.appendChild(b);
+  });
+}
+
 function vendorCell(r){
   const items = VENDORS.filter(([k])=>r.v[k]).map(([k,name])=>{
     const dim = state.vendors.size !== VENDORS.length && !state.vendors.has(k) ? ' class="dim"' : '';
@@ -686,7 +727,7 @@ function render(){
     html += `<section id="${s.id}"><div class="shead"><h2><span class="num">${s.n}</span>${s.title}</h2>
       <span class="count">${rows.length} of ${s.rows.length} systems</span></div><p class="sub">${s.sub}</p>
       <div class="tblwrap"><table><thead><tr><th>System</th><th>Vendor products</th><th>Key data</th><th>Format</th><th>Delivery</th><th>TMF Open API</th><th>SID entity</th></tr></thead><tbody>`;
-    html += rows.length ? rows.map(r=>`<tr><td class="sys">${hi(r.sys)}<br><button type="button" class="sbtn" data-toggle="${encodeURIComponent(r.sys)}" aria-expanded="${state.open.has(r.sys)}"><span class="car">›</span>Samples</button></td><td class="ven">${vendorCell(r)}</td>
+    html += rows.length ? rows.map(r=>`<tr><td class="sys">${hi(r.sys)}<br><button type="button" class="sbtn" data-toggle="${encodeURIComponent(r.sys)}" aria-expanded="${state.open.has(r.sys)}"><span class="car">›</span>Samples</button>${r.bill?`<div class="billtag"><span class="bt">Billing</span><span class="bn">${hi(r.bill)}</span></div>`:""}</td><td class="ven">${vendorCell(r)}</td>
       <td class="data">${hi(r.data)}</td><td class="fmt">${hi(r.fmt)}</td>
       <td class="del"><div class="dchips">${r.del.map(d=>`<span class="dc ${d}">${d}</span>`).join("")}</div>${r.dn?`<div class="dnote">${hi(r.dn)}</div>`:""}</td>
       <td class="api">${hi(r.api)}</td><td class="sid">${hi(r.sid)}</td></tr>`
@@ -709,15 +750,17 @@ function render(){
     <div class="notes">${NOTES.map(n=>`<div><b>${n[0]}</b><p>${n[1]}</p></div>`).join("")}</div></section>`;
   if (typeof layersHTML === "function") html += layersHTML();
   if (typeof physicalHTML === "function") html += physicalHTML();
+  if (typeof kenanHTML === "function") { const k = kenanHTML(); counts.kenan = k.count; html += k.html; }
   main.innerHTML = html;
-  const toc = [["physical","Physical layer"],["layers","Data layer"],["bss","1 · BSS"],["oss","2 · OSS"],["nss","3 · NSS / core"],["tmf","4 · TMF mapping"],["entities","5 · TMF entities"],["notes","Notes"]];
+  const toc = [["physical","Physical layer"],["layers","Data layer"],["bss","1 · BSS"],["oss","2 · OSS"],["nss","3 · NSS / core"],["tmf","4 · TMF mapping"],["entities","5 · TMF entities"],["notes","Notes"],["kenan","6 · Kenan BP"]];
   document.getElementById("toc").innerHTML = toc.map(([id,l])=>`<a href="#${id}" data-id="${id}" class="${id===state.view?"on":""}" ${id===state.view?'aria-current="page"':""}>${l}${counts[id]!==undefined?`<span class="n">${counts[id]}</span>`:""}</a>`).join("");
   main.querySelectorAll(":scope > section").forEach(s => { s.hidden = s.id !== state.view; });
   const sysView = ["bss","oss","nss"].includes(state.view);
-  ["vendors","deliv","expand"].forEach(id => { document.getElementById(id).hidden = !sysView; });
+  ["vendors","module"].forEach(id => { document.getElementById(id).hidden = !sysView; });
+  ["deliv","expand"].forEach(id => { document.getElementById(id).hidden = !(sysView || state.view === "kenan"); });
 }
 
-const VIEWS = ["physical","layers","bss","oss","nss","tmf","entities","notes"];
+const VIEWS = ["physical","layers","bss","oss","nss","tmf","entities","notes","kenan"];
 state.view = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "physical";
 function setView(v){ if (!VIEWS.includes(v) || v === state.view) return; state.view = v; render(); window.scrollTo({ top: 0 }); }
 document.getElementById("toc").addEventListener("click", e => { const a = e.target.closest("a[data-id]"); if (!a) return;
@@ -725,10 +768,11 @@ document.getElementById("toc").addEventListener("click", e => { const a = e.targ
 window.addEventListener("hashchange", () => setView(location.hash.slice(1)));
 document.getElementById("q").addEventListener("input", e=>{ state.q = e.target.value.trim(); render(); });
 document.getElementById("reset").onclick = ()=>{ state.q=""; document.getElementById("q").value="";
-  state.vendors = new Set(VENDORS.map(v=>v[0])); state.deliv = new Set(); save(); renderControls(); render(); };
+  state.vendors = new Set(VENDORS.map(v=>v[0])); state.deliv = new Set(); state.module = new Set(); save(); renderModules(); renderControls(); render(); };
 /* ---------- Samples ---------- */
 state.open = new Set(); state.tab = {};
 const ALL_ROWS = [...BSS, ...OSS, ...NSS];
+if (typeof KENAN_FEEDS !== "undefined") ALL_ROWS.push(...KENAN_FEEDS, ...KENAN_TROWS.filter(r => KENAN_TABLE_SAMPLES[r.sys]));
 const DIRECT_EXT = new Set(["csv","json","txt","md"]);
 let DL = null;
 
@@ -967,7 +1011,7 @@ document.getElementById("expand").onclick = e => {
 try { if (window.claude && window.claude.use) window.claude.use("downloads").then(d => { DL = d; document.body.classList.toggle("nodl", !d); }).catch(() => document.body.classList.add("nodl")); else document.body.classList.add("nodl"); }
 catch (e) { document.body.classList.add("nodl"); }
 
-renderControls(); render();
+renderControls(); renderModules(); render();
 </script>
 
 </body></html>

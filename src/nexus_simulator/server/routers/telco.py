@@ -21,6 +21,22 @@ class SeedAllResponse(BaseModel):
     results: dict
 
 
+@router.post("/seed-billing", response_model=SeedAllResponse)
+async def seed_billing(request: Request):
+    """Seed BSS → NSS → OSS with the billing backbone profile (Kenan BP–aligned families + Kenan tables on BSS)."""
+    import os
+
+    prev = os.environ.get("TELCO_BACKBONE_PROFILE")
+    os.environ["TELCO_BACKBONE_PROFILE"] = "billing"
+    try:
+        return await seed_all(request, include_sources=False, include_golden=False)
+    finally:
+        if prev is None:
+            os.environ.pop("TELCO_BACKBONE_PROFILE", None)
+        else:
+            os.environ["TELCO_BACKBONE_PROFILE"] = prev
+
+
 @router.post("/seed-all", response_model=SeedAllResponse)
 async def seed_all(request: Request, include_sources: bool = False, include_golden: bool = False):
     sim = getattr(request.app.state, "simulator", None)
