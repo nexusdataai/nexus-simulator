@@ -180,23 +180,49 @@ async def build_billing_overview(simulator: Any, *, layer: str | None = None) ->
 
     layer_table_counts = {ly: 0 for ly in _SVC_LAYER.values()}
     layer_row_counts = {ly: 0 for ly in _SVC_LAYER.values()}
+    layer_file_counts = {ly: 0 for ly in _SVC_LAYER.values()}
+    layer_api_counts = {ly: 0 for ly in _SVC_LAYER.values()}
+    layer_stream_counts = {ly: 0 for ly in _SVC_LAYER.values()}
     for name in _TELCO_SERVICES:
         b = layers.get(name) or {}
         ly = _SVC_LAYER[name]
-        layer_table_counts[ly] = int((b.get("totals") or {}).get("tables") or 0)
-        layer_row_counts[ly] = int((b.get("totals") or {}).get("rows") or 0)
+        t = b.get("totals") or {}
+        layer_table_counts[ly] = int(t.get("tables") or 0)
+        layer_row_counts[ly] = int(t.get("rows") or 0)
+        layer_file_counts[ly] = int(t.get("files") or 0)
+        layer_api_counts[ly] = int(t.get("apis") or 0)
+        layer_stream_counts[ly] = int(t.get("streams") or 0)
 
     if lu in {"BSS", "OSS", "NSS"}:
         all_tables = [t for t in all_tables if t.get("layer") == lu]
 
+    all_files: list[dict] = []
+    all_apis: list[dict] = []
+    all_streams: list[dict] = []
+    for name in filtered_services:
+        b = layers.get(name) or {}
+        all_files.extend(b.get("files") or [])
+        all_apis.extend(b.get("apis") or [])
+        all_streams.extend(b.get("streams") or [])
+
     return {
-        "feeds": load_billing_feeds(),
         "layers": {k: layers[k] for k in filtered_services if k in layers},
         "tables": all_tables,
+        "files": all_files,
+        "apis": all_apis,
+        "streams": all_streams,
         "totals": {
-            "feeds": len(load_billing_feeds()),
             "tables": len(all_tables),
             "rows": sum(int(t.get("rowCount") or 0) for t in all_tables),
-            "by_layer": {"tables": layer_table_counts, "rows": layer_row_counts},
+            "files": len(all_files),
+            "apis": len(all_apis),
+            "streams": len(all_streams),
+            "by_layer": {
+                "tables": layer_table_counts,
+                "rows": layer_row_counts,
+                "files": layer_file_counts,
+                "apis": layer_api_counts,
+                "streams": layer_stream_counts,
+            },
         },
     }

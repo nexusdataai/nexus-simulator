@@ -302,14 +302,24 @@ export interface BillingLayerBundle {
 }
 
 export interface BillingOverview {
-  feeds: BillingFeed[];
   layers?: Record<string, BillingLayerBundle>;
   tables: (TableRef & { service: string; schema?: string; table?: string; rows?: number; layer?: string })[];
+  files?: { name?: string; path?: string; system_key?: string | null; service?: string }[];
+  apis?: { method?: string; route_path?: string; system_key?: string | null; service?: string }[];
+  streams?: { topic?: string; event_count?: number; system_key?: string | null; service?: string }[];
   totals?: {
-    feeds: number;
     tables: number;
     rows: number;
-    by_layer?: { tables: Record<string, number>; rows: Record<string, number> };
+    files?: number;
+    apis?: number;
+    streams?: number;
+    by_layer?: {
+      tables: Record<string, number>;
+      rows: Record<string, number>;
+      files?: Record<string, number>;
+      apis?: Record<string, number>;
+      streams?: Record<string, number>;
+    };
   };
 }
 
