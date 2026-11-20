@@ -307,6 +307,8 @@ export interface BillingInputFeed {
   layer?: string;
   delivery?: string[];
   format?: string;
+  key_data?: string;
+  source_lineage?: string;
   ontology_lands_in?: string;
   tmf_sid?: string;
   artifact_count?: number;

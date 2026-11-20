@@ -3,19 +3,34 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/core/utils';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Chips, InlineError, SearchInput, TableShell, Toolbar, ToolbarSpacer } from '@/components/ds/kit';
 import { Icon } from '@/components/ds/Icon';
-import { PageHeader } from '@/components/ds/primitives';
 import { MethodTag } from '@/components/sim/BackbonePanel';
 import { PreviewModal, type PreviewTarget } from '@/components/sim/PreviewModal';
 import { TableList, type TableListRow } from '@/components/sim/TableList';
 import { RowsSheet } from '@/components/sim/RowsSheet';
 import { simByService } from '@/config/simulators';
 import { errorText, num } from '@/core/format';
-import { absoluteUrl, getBillingOverview, seedBillingTelco, sendRaw, systemApi, type BillingOverview } from '@/services/api';
+import {
+  absoluteUrl,
+  getBillingOverview,
+  seedBillingTelco,
+  sendRaw,
+  systemApi,
+  type BillingInputFeed,
+  type BillingOverview,
+} from '@/services/api';
 
 type Layer = 'all' | 'BSS' | 'OSS' | 'NSS';
-type DataView = 'tables' | 'files' | 'apis' | 'streams';
+type DataView = 'feeds' | 'tables' | 'files' | 'apis' | 'streams';
 
 const th = 'px-4 py-2.5 text-left text-xs font-medium text-muted-foreground';
 const td = 'px-4 py-2.5 align-top text-sm';
@@ -26,13 +41,64 @@ function dirOf(path?: string) {
   return i <= 0 ? '/' : p.slice(0, i);
 }
 
-/** Billing input from BSS, OSS, and NSS: tables, files, APIs, streams (simulator-generated). */
+function BillingHelpDialog({ feeds, ontologyNote }: { feeds: BillingInputFeed[]; ontologyNote?: string }) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0" aria-label="Billing help">
+          <Icon name="help" className="h-4 w-4 text-muted-foreground" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Billing input (simulator)</DialogTitle>
+          <DialogDescription>
+            Documentation for this page. The main view lists only live data from BSS, NSS, and OSS.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 text-sm text-muted-foreground">
+          {ontologyNote && <p className="text-foreground/90">{ontologyNote}</p>}
+          <p>
+            Kenan BP <strong className="font-medium text-foreground">final tables</strong> (CMF, CDR_DATA, BILL_INVOICE, …) are
+            built in Nexus Ontology ETL — see{' '}
+            <Link to="/telco-atlas/kenan.html" className="text-primary hover:underline dark:text-brand-hi">
+              Kenan reference
+            </Link>
+            .
+          </p>
+          <TableShell>
+            <table className="w-full text-xs">
+              <thead className="border-b border-border">
+                <tr>
+                  <th className={th}>Feed</th>
+                  <th className={th}>Lands in (Ontology ETL)</th>
+                  <th className={cn(th, 'hidden sm:table-cell')}>Format</th>
+                </tr>
+              </thead>
+              <tbody>
+                {feeds.map(f => (
+                  <tr key={f.id || f.name} className="border-b border-border last:border-b-0">
+                    <td className={cn(td, 'text-foreground')}>{f.name}</td>
+                    <td className={td}>{f.ontology_lands_in || '—'}</td>
+                    <td className={cn(td, 'hidden sm:table-cell')}>{f.format || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableShell>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Billing input from BSS, OSS, and NSS (simulator-generated). */
 export default function BillingPage() {
   const [data, setData] = React.useState<BillingOverview | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [layer, setLayer] = React.useState<Layer>('all');
-  const [view, setView] = React.useState<DataView>('tables');
+  const [view, setView] = React.useState<DataView>('feeds');
   const [q, setQ] = React.useState('');
   const [seeding, setSeeding] = React.useState(false);
   const [attempt, setAttempt] = React.useState(0);
@@ -52,6 +118,27 @@ export default function BillingPage() {
 
   const totals = data?.totals;
   const by = totals?.by_layer;
+
+  const feedCount = React.useMemo(() => {
+    const list = data?.input_feeds || [];
+    return layer === 'all' ? list.length : list.filter(f => f.layer === layer).length;
+  }, [data?.input_feeds, layer]);
+
+  const feeds = React.useMemo(() => {
+    const list = data?.input_feeds || [];
+    const needle = q.trim().toLowerCase();
+    return list.filter(f => {
+      if (layer !== 'all' && f.layer !== layer) return false;
+      if (!needle) return true;
+      const blob = [
+        f.name,
+        f.layer,
+        ...(f.delivery || []),
+        ...(f.artifacts || []).map(a => a.tableName || a.name || a.route_path || a.topic),
+      ].join(' ');
+      return blob.toLowerCase().includes(needle);
+    });
+  }, [data?.input_feeds, layer, q]);
 
   const tableRows = React.useMemo((): TableListRow[] => (data?.tables || []).map(t => ({
     service: t.service,
@@ -135,91 +222,62 @@ export default function BillingPage() {
     });
   };
 
+  const openArtifact = (a: NonNullable<BillingInputFeed['artifacts']>[number]) => {
+    const svc = a.service || '';
+    if (a.kind === 'table' && a.schemaName && a.tableName) {
+      setOpenTable({
+        service: svc,
+        schemaName: a.schemaName,
+        tableName: a.tableName,
+        rowCount: a.rowCount,
+        system_key: a.system_key,
+      });
+      return;
+    }
+    if (a.kind === 'file' && a.path) {
+      const name = a.name || a.path.split('/').pop() || a.path;
+      void openFile(svc, a.path, name, a.system_key);
+      return;
+    }
+    if (a.kind === 'api' && a.route_path) {
+      void openApi(svc, a.route_path, a.method || 'GET', a.system_key);
+      return;
+    }
+    if (a.kind === 'stream' && a.topic) {
+      void openStream(svc, a.topic, a.system_key);
+    }
+  };
+
+  const feedArtifactTotal = feeds.reduce((n, f) => n + (f.artifact_count ?? f.artifacts?.length ?? 0), 0);
+  const hasAnyData = (totals?.tables ?? 0) + (totals?.files ?? 0) + feedArtifactTotal > 0;
+
   return (
-    <div className="page space-y-5">
-      <PageHeader
-        title="Billing"
-        description="Inbound billing feeds only — tables, files, APIs, and streams the simulator emits for Nexus Ontology ETL. Final Kenan tables (CMF, BILL_INVOICE, CDR_DATA, …) are hydrated in the ontology, not here."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => setAttempt(a => a + 1)} disabled={loading}>
-              <Icon name="refresh" className={loading ? 'animate-spin' : ''} /> Refresh
-            </Button>
-            <Button size="sm" onClick={seedBilling} disabled={seeding}>
-              <Icon name={seeding ? 'spinner' : 'sparkles'} className={seeding ? 'animate-spin' : ''} />
-              Generate billing input
-            </Button>
-          </div>
-        }
-      />
+    <div className="page space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-medium tracking-tight text-foreground">Billing</h1>
+          <BillingHelpDialog feeds={data?.input_feeds || []} ontologyNote={data?.ontology_etl_note} />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => setAttempt(a => a + 1)} disabled={loading}>
+            <Icon name="refresh" className={loading ? 'animate-spin' : ''} /> Refresh
+          </Button>
+          <Button size="sm" onClick={seedBilling} disabled={seeding}>
+            <Icon name={seeding ? 'spinner' : 'sparkles'} className={seeding ? 'animate-spin' : ''} />
+            Generate
+          </Button>
+        </div>
+      </div>
 
       {error && <InlineError onRetry={() => setAttempt(a => a + 1)}>{error}</InlineError>}
 
-      {data?.ontology_etl_note && (
-        <p className="rounded-lg border border-border bg-surface-2/40 px-4 py-3 text-sm text-muted-foreground">
-          {data.ontology_etl_note}{' '}
-          <Link to="/telco-atlas/kenan.html" className="text-primary hover:underline dark:text-brand-hi">
-            Kenan final tables reference
-          </Link>
-        </p>
-      )}
-
-      {(data?.input_feeds?.length ?? 0) > 0 && (
-        <TableShell>
-          <div className="border-b border-border px-4 py-3">
-            <h2 className="text-sm font-medium">Inbound billing feeds</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Mapped to Kenan BP intake; <strong className="font-medium text-foreground">Lands in (Ontology ETL)</strong> is documentation only.
-              {totals?.input_feeds_with_data != null && (
-                <> · {num(totals.input_feeds_with_data)} / {num(totals.input_feeds ?? data?.input_feeds?.length)} feeds have live simulator artifacts.</>
-              )}
-            </p>
-          </div>
-          <table className="w-full text-sm">
-            <thead className="border-b border-border">
-              <tr>
-                <th className={th}>Feed</th>
-                <th className={cn(th, 'w-16')}>Layer</th>
-                <th className={th}>Delivery</th>
-                <th className={cn(th, 'hidden lg:table-cell')}>Lands in (Ontology ETL)</th>
-                <th className={cn(th, 'text-right w-24')}>Artifacts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(data?.input_feeds || []).map(feed => (
-                <tr key={feed.id || feed.name} className="border-b border-border last:border-b-0">
-                  <td className={td}>
-                    <div className="font-medium">{feed.name}</div>
-                    {!!feed.artifacts?.length && (
-                      <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-                        {feed.artifacts.slice(0, 4).map((a, i) => (
-                          <li key={`${a.kind}-${i}`}>
-                            {a.kind}: {a.tableName || a.name || a.route_path || a.topic || '—'}
-                            {a.service ? ` (${a.service.toUpperCase()})` : ''}
-                          </li>
-                        ))}
-                        {(feed.artifacts.length > 4) && <li>… +{feed.artifacts.length - 4} more</li>}
-                      </ul>
-                    )}
-                  </td>
-                  <td className={cn(td, 'text-muted-foreground')}>{feed.layer || '—'}</td>
-                  <td className={cn(td, 'text-muted-foreground')}>{(feed.delivery || []).join(', ') || '—'}</td>
-                  <td className={cn(td, 'hidden text-muted-foreground lg:table-cell')}>{feed.ontology_lands_in || '—'}</td>
-                  <td className={cn(td, 'num text-right')}>{num(feed.artifact_count ?? 0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableShell>
-      )}
-
       <Toolbar className="flex-wrap gap-3">
         <Chips<Layer>
-          label="Source system"
+          label="Source"
           value={layer}
           onChange={l => { setLayer(l); setQ(''); }}
           options={[
-            { value: 'all', label: 'All layers', count: totals?.tables },
+            { value: 'all', label: 'All', count: totals?.input_feeds },
             { value: 'BSS', label: 'BSS', count: by?.tables?.BSS },
             { value: 'OSS', label: 'OSS', count: by?.tables?.OSS },
             { value: 'NSS', label: 'NSS', count: by?.tables?.NSS },
@@ -230,13 +288,14 @@ export default function BillingPage() {
           value={view}
           onChange={v => { setView(v); setQ(''); }}
           options={[
+            { value: 'feeds', label: 'Feeds', count: feedCount },
             { value: 'tables', label: 'Tables', count: totals?.tables },
             { value: 'files', label: 'Files', count: totals?.files },
             { value: 'apis', label: 'APIs', count: totals?.apis },
             { value: 'streams', label: 'Streams', count: totals?.streams },
           ]}
         />
-        {view !== 'tables' && <SearchInput value={q} onChange={setQ} placeholder={`Search ${view}`} className="sm:w-56" />}
+        <SearchInput value={q} onChange={setQ} placeholder="Search" className="sm:w-56" />
         <ToolbarSpacer />
         {totals && !loading && (
           <span className="num text-xs text-muted-foreground">
@@ -245,14 +304,60 @@ export default function BillingPage() {
         )}
       </Toolbar>
 
-      {!loading && totals && totals.tables === 0 && totals.files === 0 && (
-        <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-          No billing data yet. Click <strong>Generate billing input</strong> to seed BSS, NSS, and OSS with billing families
-          (tables, files, APIs, and streams), or configure generation on{' '}
-          <Link to="/simulators/bss" className="text-primary hover:underline dark:text-brand-hi">BSS</Link>,{' '}
-          <Link to="/simulators/oss" className="text-primary hover:underline dark:text-brand-hi">OSS</Link>, or{' '}
-          <Link to="/simulators/nss" className="text-primary hover:underline dark:text-brand-hi">NSS</Link>.
-        </p>
+      {!loading && !hasAnyData && (
+        <p className="px-1 text-center text-sm text-muted-foreground">No billing input data.</p>
+      )}
+
+      {view === 'feeds' && (
+        <TableShell>
+          <table className="w-full text-sm">
+            <thead className="border-b border-border">
+              <tr>
+                <th className={th}>Feed</th>
+                <th className={cn(th, 'w-14')}>Layer</th>
+                <th className={th}>Delivery</th>
+                <th className={th}>Artifacts</th>
+                <th className={cn(th, 'text-right w-16')}>Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {feeds.map(feed => (
+                <tr key={feed.id || feed.name} className="border-b border-border last:border-b-0">
+                  <td className={cn(td, 'font-medium')}>{feed.name}</td>
+                  <td className={cn(td, 'text-muted-foreground')}>{feed.layer || '—'}</td>
+                  <td className={cn(td, 'text-muted-foreground')}>{(feed.delivery || []).join(', ') || '—'}</td>
+                  <td className={td}>
+                    {feed.artifacts?.length ? (
+                      <ul className="space-y-1">
+                        {feed.artifacts.map((a, i) => {
+                          const label = a.tableName || a.name || a.route_path || a.topic || '—';
+                          const svc = a.service ? a.service.toUpperCase() : '';
+                          return (
+                            <li key={`${a.kind}-${i}`}>
+                              <button
+                                type="button"
+                                onClick={() => openArtifact(a)}
+                                className="text-left text-xs hover:text-primary dark:hover:text-brand-hi"
+                              >
+                                <span className="text-muted-foreground">{a.kind}</span>{' '}
+                                <span className="font-mono">{label}</span>
+                                {svc ? <span className="text-muted-foreground"> · {svc}</span> : null}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className={cn(td, 'num text-right')}>{num(feed.artifact_count ?? 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!loading && !feeds.length && <p className="px-4 py-10 text-center text-sm text-muted-foreground">—</p>}
+        </TableShell>
       )}
 
       {view === 'tables' && (
@@ -261,7 +366,7 @@ export default function BillingPage() {
           loading={loading}
           showSystem
           onOpen={setOpenTable}
-          emptyText="No billing input tables yet. Generate billing input to create atlas and legacy source-side tables."
+          emptyText="—"
         />
       )}
 
@@ -272,7 +377,7 @@ export default function BillingPage() {
               <tr>
                 <th className={th}>System</th>
                 <th className={th}>File</th>
-                <th className={th}>Product family</th>
+                <th className={th}>Family</th>
                 <th className={cn(th, 'hidden md:table-cell')}>Path</th>
               </tr>
             </thead>
@@ -301,7 +406,7 @@ export default function BillingPage() {
               })}
             </tbody>
           </table>
-          {!loading && !files.length && <p className="px-4 py-10 text-center text-sm text-muted-foreground">No billing files yet.</p>}
+          {!loading && !files.length && <p className="px-4 py-10 text-center text-sm text-muted-foreground">—</p>}
         </TableShell>
       )}
 
@@ -313,7 +418,7 @@ export default function BillingPage() {
                 <th className={th}>System</th>
                 <th className={cn(th, 'w-20')}>Method</th>
                 <th className={th}>Route</th>
-                <th className={th}>Product family</th>
+                <th className={th}>Family</th>
               </tr>
             </thead>
             <tbody>
@@ -337,7 +442,7 @@ export default function BillingPage() {
               })}
             </tbody>
           </table>
-          {!loading && !apis.length && <p className="px-4 py-10 text-center text-sm text-muted-foreground">No billing APIs yet.</p>}
+          {!loading && !apis.length && <p className="px-4 py-10 text-center text-sm text-muted-foreground">—</p>}
         </TableShell>
       )}
 
@@ -349,7 +454,7 @@ export default function BillingPage() {
                 <th className={th}>System</th>
                 <th className={th}>Topic</th>
                 <th className={cn(th, 'text-right')}>Events</th>
-                <th className={th}>Product family</th>
+                <th className={th}>Family</th>
               </tr>
             </thead>
             <tbody>
@@ -367,7 +472,7 @@ export default function BillingPage() {
               ))}
             </tbody>
           </table>
-          {!loading && !streams.length && <p className="px-4 py-10 text-center text-sm text-muted-foreground">No billing streams yet.</p>}
+          {!loading && !streams.length && <p className="px-4 py-10 text-center text-sm text-muted-foreground">—</p>}
         </TableShell>
       )}
 
