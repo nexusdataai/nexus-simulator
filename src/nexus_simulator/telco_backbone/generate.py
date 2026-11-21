@@ -291,6 +291,19 @@ def generate_layer_backbone(
         run_vid = global_vid
         run_label = str(atlas.vendors.get(run_vid, vendor_code or "") or "") if run_vid else ""
 
+    from nexus_simulator.telco_backbone.kenan_overlay import apply_kenan_billing_overlays
+
+    apply_kenan_billing_overlays(
+        layer_upper,
+        pools,
+        tables=tables,
+        table_sources=table_sources,
+        files=files,
+        streams=streams,
+        stream_sources=stream_sources,
+        systems_in_run=set(sys_map.keys()),
+    )
+
     return {
         "layer": layer_upper,
         "systems": list(sys_map.keys()),

@@ -9,6 +9,8 @@
 
 Reference definitions live in `data/Telco-Data/kenan.html` / `kenan.js` (inbound feeds + final tables).
 
+Billing **input** file and stream bodies are aligned with the Kenan BP tab samples (`kenan.js` → `kenan_feed_fixtures.json`, regenerated via `node scripts/export_kenan_fixtures.js`). Usage files use **HDR + A01 + TRA** fixed-width layout; Flash usage uses Kenan **A01** JSON records on the MCAP stream.
+
 ## API
 
 - `POST /api/v1/telco/seed-billing` — seeds billing **input** families on BSS → NSS → OSS (`TELCO_BACKBONE_PROFILE=billing` by default).

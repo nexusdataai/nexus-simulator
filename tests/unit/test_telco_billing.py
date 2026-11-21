@@ -46,6 +46,20 @@ async def test_bss_billing_seed_marks_billing_only():
     assert not kenan_bp
 
 
+def test_kenan_usage_file_shape():
+    from nexus_simulator.telco_backbone.kenan_fixtures import load_kenan_feed_fixtures
+    from nexus_simulator.telco_backbone.kenan_formats import expand_kenan_usage_file
+
+    feeds = load_kenan_feed_fixtures()
+    raw = feeds["Usage CDRs (voice, SMS, data)"]["deliveries"]["File"]["content"]
+    pools = get_telco_pools()
+    body = expand_kenan_usage_file(raw, pools)
+    lines = [ln for ln in body.splitlines() if ln.strip()]
+    assert lines[0].startswith("HDR")
+    assert lines[-1].startswith("TRA")
+    assert sum(1 for ln in lines if ln.startswith("A01")) >= 8
+
+
 @pytest.mark.asyncio
 async def test_billing_files_have_minimum_rows():
     from nexus_simulator.config import NSSPluginConfig, OSSPluginConfig
@@ -64,7 +78,10 @@ async def test_billing_files_have_minimum_rows():
             content = await svc.read_backbone_file(str(f.get("path") or ""))
             assert content and len(content) > 80, f"empty file {name}:{f.get('name')}"
             lines = [ln for ln in content.splitlines() if ln.strip()]
-            assert len(lines) >= 5, f"too few lines in {f.get('name')}: {len(lines)}"
+            min_lines = 3 if (content.lstrip().startswith("HDR") or content.lstrip().startswith("HD")) else 5
+            assert len(lines) >= min_lines, f"too few lines in {f.get('name')}: {len(lines)}"
+            if "A01" in content or content.lstrip().startswith("HDR"):
+                assert any(ln.startswith("A01") for ln in lines), f"no Kenan A01 records in {f.get('name')}"
 
 
 @pytest.mark.asyncio

@@ -124,6 +124,10 @@ def enrich_file_content(
     """Return content with enough rows for billing feed demos and downstream ETL."""
     if not content or not content.strip():
         return content
+    if content.lstrip().startswith("HDR") and "A01" in content:
+        from nexus_simulator.telco_backbone.kenan_formats import expand_kenan_usage_file
+
+        return expand_kenan_usage_file(content, pools)
     target = billing_file_min_rows(pools)
     lower = filename.lower()
     first = content.lstrip().split("\n", 1)[0]

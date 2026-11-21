@@ -181,6 +181,7 @@ export default function BillingPage() {
     const api = systemApi(sim.apiPath);
     setPreview({
       title: name,
+      name,
       subtitle: path,
       family: family || null,
       load: () => api.backboneFile(path),

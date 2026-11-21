@@ -57,7 +57,15 @@ function parse(text: string, name = ''): Parsed {
       return tableFromList(value) || { kind: 'text', text: JSON.stringify(value, null, 2) };
     } catch { /* not JSON: fall through */ }
   }
-  if (lower.endsWith('.csv') || (trimmed.includes(',') && trimmed.includes('\n'))) {
+  const isBinaryOrKenanDump =
+    lower.endsWith('.dat') ||
+    trimmed.startsWith('HDR') ||
+    trimmed.startsWith('-- File:') ||
+    /\b(moCallRecord|pGWRecord|sCSCFRecord|TAP3)\b/.test(trimmed);
+  if (
+    !isBinaryOrKenanDump
+    && (lower.endsWith('.csv') || (trimmed.includes(',') && trimmed.includes('\n')))
+  ) {
     const lines = text.split(/\r?\n/).filter(l => l.trim());
     const headers = splitCsvLine(lines[0] || '');
     if (headers.length > 1 && lines.length > 1) return { kind: 'table', headers, rows: lines.slice(1).map(splitCsvLine) };
