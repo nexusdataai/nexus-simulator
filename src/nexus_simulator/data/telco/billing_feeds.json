@@ -19,7 +19,7 @@
     {
       "id": "usage_flash",
       "name": "Real-time usage (Flash mode)",
-      "layer": "NSS",
+      "layer": "BSS",
       "source_lineage": "Real-time usage generator (switch, IN or charging front end)",
       "key_data": "Same fields as the usage file, one event at a time",
       "format": "Kenan usage records over TCP/IP into MCAP (IPC queue)",

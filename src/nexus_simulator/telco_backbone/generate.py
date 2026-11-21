@@ -17,6 +17,7 @@ from nexus_simulator.telco_sources.identity import (
     trace_customer_internal,
 )
 from nexus_simulator.telco_backbone.atlas_catalog import load_atlas_catalog
+from nexus_simulator.telco_backbone.file_enrichment import billing_file_min_rows, enrich_file_content
 from nexus_simulator.telco_backbone.fixtures import FixtureBundle, load_sample_fixtures
 from nexus_simulator.telco_backbone.vendor_paths import normalize_vendor_route_path, vendor_lookup_key
 
@@ -202,6 +203,26 @@ def generate_layer_backbone(
                         row_copy[ii] = atlas_imsi(pools, pools.customer_ids[ri % len(pools.customer_ids)])
                     rdict = dict(zip(cols, row_copy))
                     rows_out.append(rdict)
+            min_tbl = billing_file_min_rows(pools)
+            if rows_out and len(rows_out) < min_tbl:
+                template = rows_out[0]
+                seq = _customer_id_sequence(pools)
+                while len(rows_out) < min_tbl:
+                    ri = len(rows_out)
+                    dup = copy.deepcopy(template)
+                    cid = pools.customer_ids[ri % len(pools.customer_ids)]
+                    for k in list(dup):
+                        ku = k.upper()
+                        if "CUSTOMER" in ku or ku in {"ACCOUNT_ID", "CUSTOMER_ID"}:
+                            dup[k] = seq[ri % len(seq)]
+                        elif ku == "MSISDN":
+                            dup[k] = atlas_msisdn(pools, cid)
+                        elif ku == "IMSI":
+                            dup[k] = atlas_imsi(pools, cid)
+                        elif ku.endswith("_ID") and isinstance(dup[k], str) and "-" in dup[k]:
+                            prefix = str(dup[k]).split("-", 1)[0]
+                            dup[k] = f"{prefix}-{7700000 + ri}"
+                    rows_out.append(dup)
             table_name = _sanitize_table_identifier(str(t.get("name") or system_key))
             tables[table_name] = rows_out
             table_sources[table_name] = system_key
@@ -210,11 +231,13 @@ def generate_layer_backbone(
             f = dels["File"]
             raw_content = str(f.get("content") or "")
             content = _substitute_string(raw_content, pools, ctx)
+            fname = str(f.get("name") or f"{slug}.txt")
+            content = enrich_file_content(fname, content, pools, system_key=system_key)
             files.append(
                 {
                     "system_key": system_key,
-                    "name": f.get("name") or f"{slug}.txt",
-                    "path": f"incoming/{layer_upper.lower()}/{slug}/{f.get('name') or 'export.txt'}",
+                    "name": fname,
+                    "path": f"incoming/{layer_upper.lower()}/{slug}/{fname}",
                     "content": content,
                 }
             )
@@ -239,6 +262,20 @@ def generate_layer_backbone(
             s = dels["Stream"]
             topic = str(s.get("topic") or f"{layer_upper.lower()}.{slug}")
             events = _substitute_obj(copy.deepcopy(s.get("events") or []), pools, ctx)
+            min_ev = max(4, min(billing_file_min_rows(pools) // 2, 40))
+            if events and len(events) < min_ev:
+                base = list(events)
+                while len(events) < min_ev:
+                    ei = len(events)
+                    ev = copy.deepcopy(base[ei % len(base)])
+                    cid = pools.customer_ids[ei % len(pools.customer_ids)]
+                    msisdn = atlas_msisdn(pools, cid)
+                    if isinstance(ev, dict):
+                        ev["key"] = msisdn
+                        v = ev.get("v")
+                        if isinstance(v, dict) and "imsi" in str(ev.get("key", "")).lower():
+                            ev["key"] = f"imsi-{atlas_imsi(pools, cid)}"
+                    events.append(ev)
             streams[topic] = events
             stream_sources[topic] = system_key
 

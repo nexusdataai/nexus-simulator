@@ -483,6 +483,11 @@ class TelcoBackboneMixin:
         return {"method": entry.get("method", m), "body": entry.get("body"), "route_path": entry.get("route_path")}
 
     async def read_backbone_file(self, path: str) -> Optional[str]:
+        cache_key = f"telco_backbone:file:{self.SERVICE_NAME}:{path}"
+        cached = await self.cache.get(cache_key)
+        if isinstance(cached, str) and cached.strip():
+            return cached
+
         storage = getattr(self, "_storage", None)
         b = getattr(self, "bucket", None) or ""
         arts = await self.get_backbone_artifacts()
@@ -491,15 +496,22 @@ class TelcoBackboneMixin:
             rel = path.lstrip("/")
             sk = f"{self._backbone_s3_base(str(run_id))}/files/{rel}"
             raw = await storage.get_bytes(sk)
-            if raw is not None:
+            if raw is not None and len(raw) > 0:
                 try:
-                    return raw.decode("utf-8")
+                    text = raw.decode("utf-8")
                 except UnicodeDecodeError:
-                    return None
-        key = f"telco_backbone:file:{self.SERVICE_NAME}:{path}"
-        raw = await self.cache.get(key)
-        if isinstance(raw, str):
-            return raw
+                    text = None
+                if text and text.strip():
+                    return text
+
+        if isinstance(cached, str):
+            return cached
+        if isinstance(arts, dict):
+            for f in arts.get("files") or []:
+                if isinstance(f, dict) and f.get("path") == path:
+                    body = f.get("content")
+                    if isinstance(body, str) and body:
+                        return body
         return None
 
     async def seed_scenario(self, name: str) -> dict[str, Any]:

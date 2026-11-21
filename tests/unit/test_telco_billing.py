@@ -47,6 +47,27 @@ async def test_bss_billing_seed_marks_billing_only():
 
 
 @pytest.mark.asyncio
+async def test_billing_files_have_minimum_rows():
+    from nexus_simulator.config import NSSPluginConfig, OSSPluginConfig
+
+    sim = build_simulator(
+        SimulatorConfig(bss=BSSPluginConfig(), nss=NSSPluginConfig(), oss=OSSPluginConfig())
+    )
+    pools = get_telco_pools()
+    for name in ("bss", "nss", "oss"):
+        svc = getattr(sim, name)
+        if svc:
+            await svc.generate_backbone(pools=pools, include_legacy_tables=True)
+    for name in ("bss", "nss"):
+        svc = getattr(sim, name)
+        for f in (await svc.get_backbone_artifacts()).get("files") or []:
+            content = await svc.read_backbone_file(str(f.get("path") or ""))
+            assert content and len(content) > 80, f"empty file {name}:{f.get('name')}"
+            lines = [ln for ln in content.splitlines() if ln.strip()]
+            assert len(lines) >= 5, f"too few lines in {f.get('name')}: {len(lines)}"
+
+
+@pytest.mark.asyncio
 async def test_billing_overview_endpoint():
     from nexus_simulator.services.telco_billing_overview import build_billing_overview, load_billing_feeds
 

@@ -96,6 +96,7 @@
       "layer": "BSS",
       "deliveries": [
         "Table",
+        "File",
         "API"
       ],
       "phase_a": false
